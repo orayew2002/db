@@ -31,6 +31,7 @@ type Wal struct {
 	f          *os.File
 	buf        *bufio.Writer
 	closed     bool
+	done       chan struct{}
 }
 
 type action struct {
@@ -42,7 +43,7 @@ type action struct {
 }
 
 func NewWal(path string) *Wal {
-	os.MkdirAll(filepath.Dir(path), os.ModePerm)
+	_ = os.MkdirAll(filepath.Dir(path), os.ModePerm)
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -50,14 +51,14 @@ func NewWal(path string) *Wal {
 	}
 
 	w := &Wal{
-		f:   f,
-		buf: bufio.NewWriterSize(f, 1<<20),
+		f:    f,
+		buf:  bufio.NewWriterSize(f, 1<<20),
+		done: make(chan struct{}),
 	}
 
 	w.cond = sync.NewCond(&w.mu)
 
 	w.recoverLSN()
-
 	go w.writerLoop()
 
 	return w
@@ -67,8 +68,13 @@ func (w *Wal) writerLoop() {
 	ticker := time.NewTicker(5 * time.Millisecond)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		w.flush()
+	for {
+		select {
+		case <-ticker.C:
+			w.flush()
+		case <-w.done:
+			return
+		}
 	}
 }
 
@@ -80,7 +86,8 @@ func (w *Wal) Append(a Action, table, col string, val any) (uint64, error) {
 		return 0, errors.New("wal closed")
 	}
 
-	lsn := w.lsn + 1
+	w.lsn++
+	lsn := w.lsn
 
 	entry := action{
 		LSN:   lsn,
@@ -95,7 +102,6 @@ func (w *Wal) Append(a Action, table, col string, val any) (uint64, error) {
 		return 0, err
 	}
 
-	// length prefix (чтобы избежать проблем Scanner)
 	if err := binary.Write(w.buf, binary.LittleEndian, uint32(len(b))); err != nil {
 		return 0, err
 	}
@@ -103,8 +109,6 @@ func (w *Wal) Append(a Action, table, col string, val any) (uint64, error) {
 	if _, err := w.buf.Write(b); err != nil {
 		return 0, err
 	}
-
-	w.lsn = lsn
 
 	return lsn, nil
 }
@@ -116,45 +120,32 @@ func (w *Wal) Commit(lsn uint64) error {
 	for w.flushedLSN < lsn {
 		w.cond.Wait()
 	}
-
 	return nil
 }
 
 func (w *Wal) flush() {
 	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	if w.buf.Buffered() == 0 {
-		w.mu.Unlock()
 		return
 	}
 
-	// flush buffer в OS
-	if err := w.buf.Flush(); err != nil {
-		w.mu.Unlock()
-		return
-	}
-
-	// fsync (самое дорогое, но важное)
-	if err := w.f.Sync(); err != nil {
-		w.mu.Unlock()
-		return
-	}
+	_ = w.buf.Flush()
+	_ = w.f.Sync()
 
 	w.flushedLSN = w.lsn
 	w.cond.Broadcast()
-
-	w.mu.Unlock()
 }
 
 func (w *Wal) Replay(handler func(a action)) error {
+	// Flush and seek under the lock to avoid racing with writerLoop.
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	_ = w.buf.Flush()
+	_, err := w.f.Seek(0, 0)
+	w.mu.Unlock()
 
-	if err := w.buf.Flush(); err != nil {
-		return err
-	}
-
-	if _, err := w.f.Seek(0, 0); err != nil {
+	if err != nil {
 		return err
 	}
 
@@ -175,14 +166,15 @@ func (w *Wal) Replay(handler func(a action)) error {
 		}
 
 		var act action
-		if err := json.Unmarshal(data, &act); err != nil {
-			continue
+		if err := json.Unmarshal(data, &act); err == nil {
+			handler(act) // SAFE: no mutex held
 		}
-
-		handler(act)
 	}
 
-	_, err := w.f.Seek(0, io.SeekEnd)
+	w.mu.Lock()
+	_, err = w.f.Seek(0, io.SeekEnd)
+	w.mu.Unlock()
+
 	return err
 }
 
@@ -220,18 +212,17 @@ func (w *Wal) recoverLSN() {
 	w.lsn = last
 	w.flushedLSN = last
 
-	w.f.Seek(0, io.SeekEnd)
+	_, _ = w.f.Seek(0, io.SeekEnd)
 }
 
 func (w *Wal) Close() error {
+	close(w.done) // signal writerLoop to exit
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	w.closed = true
 
-	if err := w.buf.Flush(); err != nil {
-		return err
-	}
-
+	_ = w.buf.Flush()
 	return w.f.Sync()
 }

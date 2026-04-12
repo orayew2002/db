@@ -50,13 +50,25 @@ func (db *Database) walFunction() func(a action) {
 
 		case D:
 			db.Delete(a.Table, a.Col, a.Val)
+
+		case U:
+			// After JSON round-trip, us{val, vals} becomes map[string]any.
+			m, ok := a.Val.(map[string]any)
+			if !ok {
+				return
+			}
+			v, ok := m["vals"].(map[string]any)
+			if !ok {
+				return
+			}
+			db.Update(a.Table, a.Col, m["val"], vals(v))
 		}
 	}
 }
 
-func (d *Database) Setfm(fm FM) {
+func (d *Database) Setfm(fm FM) error {
 	d.fm = fm
-	d.fm.Load(&d.tables)
+	return d.fm.Load(&d.tables)
 }
 
 func (d *Database) CreateTable(name string, columns []string) error {
@@ -148,6 +160,10 @@ func (d *Database) GetTables() []string {
 	}
 
 	return t
+}
+
+func (d *Database) Close() {
+	d.w.Close()
 }
 
 type vals map[string]any

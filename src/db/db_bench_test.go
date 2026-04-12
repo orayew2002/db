@@ -21,11 +21,13 @@ func BenchmarkInsert(b *testing.B) {
 
 	b.ResetTimer()
 
-	for b.Loop() {
+	for i := 0; i < b.N; i++ {
 		db.Insert("users", map[string]any{
-			"id":    fmt.Sprintf("%d", b.N),
+			"id":    fmt.Sprintf("%d", i),
 			"name":  "user name",
 			"email": "user email",
 		})
 	}
+
+	db.Close()
 }

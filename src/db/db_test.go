@@ -6,7 +6,7 @@ import (
 )
 
 func TestDatbase(t *testing.T) {
-	db := Create(filepath.Join("database", "db.json"), filepath.Join("database", "wal.log"))
+	db := Create(filepath.Join("database", "wal.log"), filepath.Join("database", "db.json"))
 
 	t.Run("run database", func(t *testing.T) {
 		if err := db.CreateTable("users", []string{"id", "name", "email"}); err != nil {
