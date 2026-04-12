@@ -9,9 +9,14 @@ func TestWAL(t *testing.T) {
 	wal := NewWal(filepath.Join(t.TempDir(), "wal.log"))
 
 	t.Run("testing create table", func(t *testing.T) {
-		wal.AS(CT, "users", "", []string{"id", "username", "email"})
-		wal.AS(CT, "products", "", []string{"id", "name", "price"})
-		wal.AS(CT, "markets", "", []string{"id", "name", "city"})
+		lsn, _ := wal.Append(CT, "users", "", []string{"id", "username", "email"})
+		wal.Commit(lsn)
+
+		lsn, _ = wal.Append(CT, "products", "", []string{"id", "name", "price"})
+		wal.Commit(lsn)
+
+		lsn, _ = wal.Append(CT, "markets", "", []string{"id", "name", "city"})
+		wal.Commit(lsn)
 	})
 
 	t.Run("testing insert users", func(t *testing.T) {
@@ -24,9 +29,11 @@ func TestWAL(t *testing.T) {
 		}
 
 		for _, u := range users {
-			if err := wal.AS(I, "users", "", u); err != nil {
+			lsn, err := wal.Append(I, "users", "", u)
+			if err != nil {
 				t.Error(err)
 			}
+			wal.Commit(lsn)
 		}
 	})
 
@@ -40,9 +47,11 @@ func TestWAL(t *testing.T) {
 		}
 
 		for _, p := range products {
-			if err := wal.AS(I, "products", "", p); err != nil {
+			lsn, err := wal.Append(I, "products", "", p)
+			if err != nil {
 				t.Error(err)
 			}
+			wal.Commit(lsn)
 		}
 	})
 
@@ -56,26 +65,31 @@ func TestWAL(t *testing.T) {
 		}
 
 		for _, m := range markets {
-			if err := wal.AS(I, "markets", "", m); err != nil {
+			lsn, err := wal.Append(I, "markets", "", m)
+			if err != nil {
 				t.Error(err)
 			}
+			wal.Commit(lsn)
 		}
 	})
 
 	t.Run("testing delete", func(t *testing.T) {
-		if err := wal.AS(D, "users", "id", "u1001"); err != nil {
+		lsn, err := wal.Append(D, "users", "id", "u1001")
+		if err != nil {
 			t.Error(err)
 		}
+		wal.Commit(lsn)
 	})
 
 	t.Run("testing update", func(t *testing.T) {
-		err := wal.AS(U, "users", "id", us{
+		lsn, err := wal.Append(U, "users", "id", us{
 			val:  "u1001",
 			vals: map[string]any{"id": "u1001", "username": "john_doe", "email": "john@gmail.com"}})
 
 		if err != nil {
 			t.Error(err)
 		}
+		wal.Commit(lsn)
 	})
 
 	t.Run("testing replay", func(t *testing.T) {

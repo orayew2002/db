@@ -2,39 +2,35 @@ package db
 
 import (
 	"bufio"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 )
 
 type Action string
 
 const (
-	// Use this key for inserting data
-	I Action = "insert"
-
-	// Use this key for delete data
-	D Action = "delete"
-
-	// Use this key for update data
-	U Action = "update"
-
-	// Use this key for create table
+	I  Action = "insert"
+	D  Action = "delete"
+	U  Action = "update"
 	CT Action = "create_table"
-
-	// Use this key for update table
 	UT Action = "update_table"
-
-	// Use this key for delete table
 	DT Action = "delete_table"
 )
 
 type Wal struct {
-	lsn uint64
-	f   *os.File
-	buf *bufio.Writer
+	mu         sync.Mutex
+	cond       *sync.Cond
+	lsn        uint64
+	flushedLSN uint64
+	f          *os.File
+	buf        *bufio.Writer
+	closed     bool
 }
 
 type action struct {
@@ -43,11 +39,6 @@ type action struct {
 	Table string `json:"table"`
 	Col   string `json:"col"`
 	Val   any    `json:"val"`
-}
-
-type update struct {
-	val  any
-	vals any
 }
 
 func NewWal(path string) *Wal {
@@ -60,17 +51,39 @@ func NewWal(path string) *Wal {
 
 	w := &Wal{
 		f:   f,
-		buf: bufio.NewWriter(f),
+		buf: bufio.NewWriterSize(f, 1<<20),
 	}
 
+	w.cond = sync.NewCond(&w.mu)
+
 	w.recoverLSN()
+
+	go w.writerLoop()
 
 	return w
 }
 
-func (w *Wal) Append(a Action, table, col string, val any) error {
+func (w *Wal) writerLoop() {
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		w.flush()
+	}
+}
+
+func (w *Wal) Append(a Action, table, col string, val any) (uint64, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.closed {
+		return 0, errors.New("wal closed")
+	}
+
+	lsn := w.lsn + 1
+
 	entry := action{
-		LSN:   w.lsn + 1,
+		LSN:   lsn,
 		A:     a,
 		Table: table,
 		Col:   col,
@@ -79,77 +92,98 @@ func (w *Wal) Append(a Action, table, col string, val any) error {
 
 	b, err := json.Marshal(entry)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	b = append(b, '\n')
-
-	n, err := w.buf.Write(b)
-	if err != nil || n != len(b) {
-		return errors.New("write failed")
+	// length prefix (чтобы избежать проблем Scanner)
+	if err := binary.Write(w.buf, binary.LittleEndian, uint32(len(b))); err != nil {
+		return 0, err
 	}
 
-	w.lsn++
+	if _, err := w.buf.Write(b); err != nil {
+		return 0, err
+	}
+
+	w.lsn = lsn
+
+	return lsn, nil
+}
+
+func (w *Wal) Commit(lsn uint64) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	for w.flushedLSN < lsn {
+		w.cond.Wait()
+	}
 
 	return nil
 }
 
-func (w *Wal) Sync() error {
-	if err := w.buf.Flush(); err != nil {
-		return err
-	}
-	return w.f.Sync()
-}
+func (w *Wal) flush() {
+	w.mu.Lock()
 
-func (w *Wal) AS(a Action, table, col string, val any) error {
-	if err := w.Append(a, table, col, val); err != nil {
-		return err
+	if w.buf.Buffered() == 0 {
+		w.mu.Unlock()
+		return
 	}
-	return w.Sync()
+
+	// flush buffer в OS
+	if err := w.buf.Flush(); err != nil {
+		w.mu.Unlock()
+		return
+	}
+
+	// fsync (самое дорогое, но важное)
+	if err := w.f.Sync(); err != nil {
+		w.mu.Unlock()
+		return
+	}
+
+	w.flushedLSN = w.lsn
+	w.cond.Broadcast()
+
+	w.mu.Unlock()
 }
 
 func (w *Wal) Replay(handler func(a action)) error {
-	_, err := w.f.Seek(0, 0)
-	if err != nil {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if err := w.buf.Flush(); err != nil {
 		return err
 	}
 
-	scanner := bufio.NewScanner(w.f)
+	if _, err := w.f.Seek(0, 0); err != nil {
+		return err
+	}
 
-	for scanner.Scan() {
-		line := scanner.Bytes()
+	reader := bufio.NewReader(w.f)
+
+	for {
+		var size uint32
+		if err := binary.Read(reader, binary.LittleEndian, &size); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		data := make([]byte, size)
+		if _, err := io.ReadFull(reader, data); err != nil {
+			return err
+		}
+
 		var act action
-		if err := json.Unmarshal(line, &act); err != nil {
+		if err := json.Unmarshal(data, &act); err != nil {
 			continue
 		}
 
 		handler(act)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	if w.buf != nil {
-		if err := w.buf.Flush(); err != nil {
-			return err
-		}
-	}
-	if err := w.f.Sync(); err != nil {
-		return err
-	}
-
-	if err := w.f.Truncate(0); err != nil {
-		return err
-	}
-
-	w.lsn = 0
-	if _, err := w.f.Seek(0, io.SeekEnd); err != nil {
-		return err
-	}
-
-	w.buf = bufio.NewWriter(w.f)
-	return nil
+	_, err := w.f.Seek(0, io.SeekEnd)
+	return err
 }
 
 func (w *Wal) recoverLSN() {
@@ -158,13 +192,23 @@ func (w *Wal) recoverLSN() {
 		return
 	}
 
-	scanner := bufio.NewScanner(w.f)
+	reader := bufio.NewReader(w.f)
 
 	var last uint64
 
-	for scanner.Scan() {
+	for {
+		var size uint32
+		if err := binary.Read(reader, binary.LittleEndian, &size); err != nil {
+			break
+		}
+
+		data := make([]byte, size)
+		if _, err := io.ReadFull(reader, data); err != nil {
+			break
+		}
+
 		var act action
-		if err := json.Unmarshal(scanner.Bytes(), &act); err != nil {
+		if err := json.Unmarshal(data, &act); err != nil {
 			continue
 		}
 
@@ -174,27 +218,20 @@ func (w *Wal) recoverLSN() {
 	}
 
 	w.lsn = last
+	w.flushedLSN = last
+
 	w.f.Seek(0, io.SeekEnd)
 }
 
 func (w *Wal) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.closed = true
+
 	if err := w.buf.Flush(); err != nil {
 		return err
 	}
-	return w.f.Close()
-}
 
-func toStringSlice(v any) []string {
-	arr, ok := v.([]any)
-	if !ok {
-		return nil
-	}
-
-	res := make([]string, 0, len(arr))
-	for _, item := range arr {
-		if s, ok := item.(string); ok {
-			res = append(res, s)
-		}
-	}
-	return res
+	return w.f.Sync()
 }
