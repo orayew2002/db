@@ -15,4 +15,5 @@ require (
 	github.com/olekukonko/ll v0.1.6 // indirect
 	github.com/olekukonko/tablewriter v1.1.4 // indirect
 	golang.org/x/sys v0.30.0 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 )

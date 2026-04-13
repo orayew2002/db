@@ -11,3 +11,6 @@ pprof:
 	@echo "Running benchmark and saving CPU profile to cpu.prof..."
 	@go test ./src/db -bench=Insert -benchmem -cpuprofile=cpu.prof
 	@go tool pprof cpu.prof
+
+proto-gen:
+	protoc --go_out=. ./src/proto/wal_domains.proto

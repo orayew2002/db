@@ -17,8 +17,8 @@ func init() {
 
 func BenchmarkInsert(b *testing.B) {
 	db := Create(Options{
-		WFP: "database/wal.json",
-		FFP: "database/db.json",
+		WFP: "../../database/wal.json",
+		FFP: "../../database/db.json",
 		UWC: false,
 	})
 

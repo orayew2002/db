@@ -94,8 +94,8 @@ func TestWAL(t *testing.T) {
 
 	t.Run("testing replay", func(t *testing.T) {
 		db := Create(Options{
-			WFP: filepath.Join("../../database/","wal.json"),
-			FFP: filepath.Join("../../database/","db.json"),
+			WFP: filepath.Join("../../database/", "wal.json"),
+			FFP: filepath.Join("../../database/", "db.json"),
 			UWC: false,
 		})
 

@@ -5,11 +5,12 @@ import "strings"
 type Action string
 
 const (
-	ShowTables  Action = "show_tables"
+	ShowTables  Action = "show tables"
 	CreateTable Action = "create table"
 	Insert      Action = "insert"
 	Delete      Action = "delete"
 	Get         Action = "get"
+	CommandNotFound Action = "not_found"
 )
 
 func parseCMD(cmd string) Action {
@@ -35,5 +36,5 @@ func parseCMD(cmd string) Action {
 		return Get
 	}
 
-	return ShowTables
+	return CommandNotFound
 }
