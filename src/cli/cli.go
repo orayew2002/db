@@ -61,28 +61,13 @@ func (c *CLI) get(cmd string) {
 		return
 	}
 
-	var heads []string
-	for h := range rows[0] {
-		heads = append(heads, h)
-	}
+	heads := c.db.GetColumns(flags[3])
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.Header(heads)
 
-	data := make([][]string, len(rows))
-	for i, t := range rows {
-		for _, v := range t {
-			if v == nil {
-				data[i] = append(data[i], "")
-				continue
-			}
-
-			data[i] = append(data[i], v.(string))
-		}
-	}
-
-	for _, v := range data {
-		table.Append(v)
+	for _, row := range rows {
+		table.Append(rowToStrings(row, heads))
 	}
 
 	table.Render()
@@ -142,4 +127,20 @@ func (c *CLI) createTable(cmd string) {
 	}
 
 	fmt.Printf("%s table created \n", table)
+}
+
+func rowToStrings(row map[string]any, columns []string) []string {
+	values := make([]string, 0, len(columns))
+
+	for _, column := range columns {
+		value, ok := row[column]
+		if !ok || value == nil {
+			values = append(values, "")
+			continue
+		}
+
+		values = append(values, fmt.Sprint(value))
+	}
+
+	return values
 }
