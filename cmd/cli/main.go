@@ -6,7 +6,12 @@ import (
 )
 
 func main() {
-	db := db.Create("database/wal.json", "database/db.json")
+	db := db.Create(db.Options{
+		WFP: "database/wal.json",
+		FFP: "database/db.json",
+		UWC: false,
+	})
+
 	c := cli.NewCli(db)
 	c.Run()
 }

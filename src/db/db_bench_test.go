@@ -16,9 +16,13 @@ func init() {
 }
 
 func BenchmarkInsert(b *testing.B) {
-	db := Create("../../database/bench_wal.json", "../../database/bench_db.json")
-	db.CreateTable("users", []string{"id", "name", "email"})
+	db := Create(Options{
+		WFP: "database/wal.json",
+		FFP: "database/db.json",
+		UWC: false,
+	})
 
+	db.CreateTable("users", []string{"id", "name", "email"})
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

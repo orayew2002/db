@@ -7,18 +7,30 @@ import (
 	"github.com/orayew2002/db/src/fm"
 )
 
+type Options struct {
+	WFP string
+	FFP string
+	UWC bool
+}
+
 type Database struct {
 	tables map[string]*Table
 	fm     FM
 	w      *Wal
+
+	// UWC (Use WAL Commit) indicates whether each request waits for WAL commit.
+	// When enabled, every operation calls Commit() and waits for fsync,
+	// providing strong durability guarantees but significantly reducing performance.
+	uwc bool
 }
 
 // WFP -> WAl file path , FFP -> DB file path
-func Create(wfp, ffp string) *Database {
+func Create(o Options) *Database {
 	db := Database{
 		tables: make(map[string]*Table),
-		w:      NewWal(wfp),
-		fm:     fm.NewFmFullDump(ffp),
+		w:      NewWal(o.WFP),
+		fm:     fm.NewFmFullDump(o.FFP),
+		uwc:    o.UWC,
 	}
 
 	if err := db.fm.Load(&db.tables); err != nil {
@@ -52,7 +64,6 @@ func (db *Database) walFunction() func(a action) {
 			db.Delete(a.Table, a.Col, a.Val)
 
 		case U:
-			// After JSON round-trip, us{val, vals} becomes map[string]any.
 			m, ok := a.Val.(map[string]any)
 			if !ok {
 				return
@@ -86,7 +97,11 @@ func (d *Database) CreateTable(name string, columns []string) error {
 		Columns: columns,
 	}
 
-	return d.w.Commit(lsn)
+	if d.uwc {
+		return d.w.Commit(lsn)
+	}
+
+	return nil
 }
 
 func (d *Database) Delete(t string, col string, val any) {
@@ -97,7 +112,9 @@ func (d *Database) Delete(t string, col string, val any) {
 	}
 
 	d.tables[t].Delete(col, val)
-	d.w.Commit(lsn)
+	if d.uwc {
+		d.w.Commit(lsn)
+	}
 }
 
 func (d *Database) Insert(t string, v map[string]any) {
@@ -113,7 +130,10 @@ func (d *Database) Insert(t string, v map[string]any) {
 		panic(err.Error())
 	}
 	table.Insert(mapToRow(v, table.Columns))
-	_ = d.w.Commit(lsn)
+
+	if d.uwc {
+		_ = d.w.Commit(lsn)
+	}
 }
 
 // Update item structure
@@ -139,7 +159,9 @@ func (d *Database) Update(name string, col string, val any, v vals) {
 	}
 
 	table.Update(col, val, v.toRow(table.Columns))
-	d.w.Commit(lsn)
+	if d.uwc {
+		_ = d.w.Commit(lsn)
+	}
 }
 
 func (d *Database) Get(name string) []map[string]any {
