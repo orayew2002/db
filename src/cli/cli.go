@@ -56,7 +56,7 @@ func (c *CLI) Run() {
 
 func (c *CLI) get(cmd string) {
 	flags := strings.Split(cmd, " ")
-	rows := c.db.Get(flags[2])
+	rows := c.db.Get(flags[3])
 	if len(rows) == 0 {
 		return
 	}
@@ -72,6 +72,11 @@ func (c *CLI) get(cmd string) {
 	data := make([][]string, len(rows))
 	for i, t := range rows {
 		for _, v := range t {
+			if v == nil {
+				data[i] = append(data[i], "")
+				continue
+			}
+
 			data[i] = append(data[i], v.(string))
 		}
 	}
@@ -79,6 +84,7 @@ func (c *CLI) get(cmd string) {
 	for _, v := range data {
 		table.Append(v)
 	}
+
 	table.Render()
 }
 
