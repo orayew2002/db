@@ -39,9 +39,9 @@ func Create(o Options) *Database {
 
 	if err := db.w.Replay(db.walFunction()); err != nil {
 		fmt.Println(err.Error())
-	}
-
-	if err := db.fm.Flush(db.tables); err != nil {
+	} else if err := db.fm.Flush(db.tables); err != nil {
+		fmt.Println(err.Error())
+	} else if err := db.w.Reset(); err != nil {
 		fmt.Println(err.Error())
 	}
 
@@ -50,29 +50,8 @@ func Create(o Options) *Database {
 
 func (db *Database) walFunction() func(a action) {
 	return func(a action) {
-		switch a.A {
-		case CT:
-			db.CreateTable(a.Table, toStringSlice(a.Val))
-
-		case I:
-			v, ok := a.Val.(map[string]any)
-			if ok {
-				db.Insert(a.Table, v)
-			}
-
-		case D:
-			db.Delete(a.Table, a.Col, a.Val)
-
-		case U:
-			m, ok := a.Val.(map[string]any)
-			if !ok {
-				return
-			}
-			v, ok := m["vals"].(map[string]any)
-			if !ok {
-				return
-			}
-			db.Update(a.Table, a.Col, m["val"], vals(v))
+		if err := db.apply(a); err != nil {
+			fmt.Println(err.Error())
 		}
 	}
 }
@@ -92,10 +71,7 @@ func (d *Database) CreateTable(name string, columns []string) error {
 		return err
 	}
 
-	d.tables[name] = &Table{
-		Name:    name,
-		Columns: columns,
-	}
+	d.applyCreateTable(name, columns)
 
 	if d.uwc {
 		return d.w.Commit(lsn)
@@ -111,10 +87,8 @@ func (d *Database) Delete(t string, col string, val any) {
 		panic(err.Error())
 	}
 
-	d.tables[t].Delete(col, val)
-	if d.uwc {
-		d.w.Commit(lsn)
-	}
+	d.applyDelete(t, col, val)
+	d.w.Commit(lsn)
 }
 
 func (d *Database) Insert(t string, v map[string]any) {
@@ -129,11 +103,8 @@ func (d *Database) Insert(t string, v map[string]any) {
 	if err != nil {
 		panic(err.Error())
 	}
-	table.Insert(mapToRow(v, table.Columns))
-
-	if d.uwc {
-		_ = d.w.Commit(lsn)
-	}
+	d.applyInsert(t, v)
+	_ = d.w.Commit(lsn)
 }
 
 // Update item structure
@@ -158,15 +129,18 @@ func (d *Database) Update(name string, col string, val any, v vals) {
 		panic(err.Error())
 	}
 
-	table.Update(col, val, v.toRow(table.Columns))
-	if d.uwc {
-		_ = d.w.Commit(lsn)
-	}
+	d.applyUpdate(name, col, val, v)
+	d.w.Commit(lsn)
 }
 
 func (d *Database) Get(name string) []map[string]any {
 	d.checkTable(name)
 	return d.tables[name].Rows
+}
+
+func (d *Database) GetColumns(name string) []string {
+	d.checkTable(name)
+	return append([]string(nil), d.tables[name].Columns...)
 }
 
 func (d *Database) checkTable(name string) {
@@ -186,6 +160,65 @@ func (d *Database) GetTables() []string {
 
 func (d *Database) Close() {
 	d.w.Close()
+}
+
+func (d *Database) apply(a action) error {
+	switch a.A {
+	case CT:
+		d.applyCreateTable(a.Table, toStringSlice(a.Val))
+		return nil
+	case I:
+		v, ok := a.Val.(map[string]any)
+		if !ok {
+			return errors.New("invalid insert payload")
+		}
+		d.checkTable(a.Table)
+		d.applyInsert(a.Table, v)
+		return nil
+	case D:
+		d.checkTable(a.Table)
+		d.applyDelete(a.Table, a.Col, a.Val)
+		return nil
+	case U:
+		m, ok := a.Val.(map[string]any)
+		if !ok {
+			return errors.New("invalid update payload")
+		}
+
+		v, ok := m["vals"].(map[string]any)
+		if !ok {
+			return errors.New("invalid update values")
+		}
+
+		d.checkTable(a.Table)
+		d.applyUpdate(a.Table, a.Col, m["val"], vals(v))
+		return nil
+	default:
+		return fmt.Errorf("unsupported action %q", a.A)
+	}
+}
+
+func (d *Database) applyCreateTable(name string, columns []string) {
+	if _, ext := d.tables[name]; ext {
+		return
+	}
+
+	d.tables[name] = &Table{
+		Name:    name,
+		Columns: append([]string(nil), columns...),
+	}
+}
+
+func (d *Database) applyDelete(table string, col string, val any) {
+	d.tables[table].Delete(col, val)
+}
+
+func (d *Database) applyInsert(table string, v map[string]any) {
+	d.tables[table].Insert(mapToRow(v, d.tables[table].Columns))
+}
+
+func (d *Database) applyUpdate(table string, col string, val any, v vals) {
+	d.tables[table].Update(col, val, v.toRow(d.tables[table].Columns))
 }
 
 type vals map[string]any

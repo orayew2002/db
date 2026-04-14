@@ -229,3 +229,29 @@ func (w *Wal) Close() error {
 	_ = w.buf.Flush()
 	return w.f.Sync()
 }
+
+func (w *Wal) Reset() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if err := w.buf.Flush(); err != nil {
+		return err
+	}
+
+	if err := w.f.Truncate(0); err != nil {
+		return err
+	}
+
+	if _, err := w.f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+
+	if err := w.f.Sync(); err != nil {
+		return err
+	}
+
+	w.lsn = 0
+	w.flushedLSN = 0
+
+	return nil
+}
