@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "./src/proto;proto";
+
+// Catalogs holds a list of catalog entries.
+message Catalogs {
+  repeated Catalog catalogs = 1;
+}
+
+// Catalog represents a mapping (e.g., table or column).
+message Catalog {
+  uint32 id = 1;
+  string value = 2;
+}

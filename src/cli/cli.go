@@ -52,20 +52,27 @@ func (c *CLI) Run() {
 			c.get(line)
 
 		case CommandNotFound:
-			fmt.Print("command not found")
+			fmt.Print("command not found \n")
 		}
 	}
 }
 
 func (c *CLI) get(cmd string) {
 	flags := strings.Split(cmd, " ")
-	rows := c.db.Get(flags[3])
+	rows, err := c.db.Get(flags[3])
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 	if len(rows) == 0 {
 		return
 	}
 
-	heads := c.db.GetColumns(flags[3])
-
+	heads, err := c.db.GetColumns(flags[3])
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.Header(heads)
 

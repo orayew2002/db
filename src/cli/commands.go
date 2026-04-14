@@ -5,11 +5,11 @@ import "strings"
 type Action string
 
 const (
-	ShowTables  Action = "show tables"
-	CreateTable Action = "create table"
-	Insert      Action = "insert"
-	Delete      Action = "delete"
-	Get         Action = "get"
+	ShowTables      Action = "show tables"
+	CreateTable     Action = "create table"
+	Insert          Action = "insert"
+	Delete          Action = "delete"
+	Get             Action = "get"
 	CommandNotFound Action = "not_found"
 )
 

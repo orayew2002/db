@@ -8,7 +8,11 @@ import (
 
 func TestDatbase(t *testing.T) {
 	dir := t.TempDir()
-	db := Create(filepath.Join(dir, "wal.log"), filepath.Join(dir, "db.json"))
+	db := Create(Options{
+		WFP: filepath.Join(dir, "wal"),
+		FFP: filepath.Join(dir, "db"),
+		UWC: false,
+	})
 	defer db.Close()
 
 	t.Run("run database", func(t *testing.T) {
@@ -28,19 +32,25 @@ func TestDatbase(t *testing.T) {
 
 func TestDatabaseRecoveryDoesNotDuplicateOrReappendWAL(t *testing.T) {
 	dir := t.TempDir()
-	walPath := filepath.Join(dir, "wal.log")
-	snapshotPath := filepath.Join(dir, "db.json")
+	walPath := filepath.Join(dir, "wal")
+	snapshotPath := filepath.Join(dir, "db")
 
-	db := Create(walPath, snapshotPath)
+	db := Create(Options{
+		WFP: walPath,
+		FFP: snapshotPath,
+	})
 	if err := db.CreateTable("users", []string{"id", "name", "email"}); err != nil {
 		t.Fatal(err)
 	}
 
-	db.Insert("users", map[string]any{
+	err := db.Insert("users", map[string]any{
 		"id":    "u1",
 		"name":  "Alice",
 		"email": "alice@example.com",
 	})
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	db.Close()
 
 	infoBeforeRecovery, err := os.Stat(walPath)
@@ -51,8 +61,14 @@ func TestDatabaseRecoveryDoesNotDuplicateOrReappendWAL(t *testing.T) {
 		t.Fatal("expected WAL to contain uncheckpointed writes before recovery")
 	}
 
-	recovered := Create(walPath, snapshotPath)
-	rows := recovered.Get("users")
+	recovered := Create(Options{
+		WFP: walPath,
+		FFP: snapshotPath,
+	})
+	rows, err := recovered.Get("users")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row after recovery, got %d", len(rows))
 	}
@@ -69,10 +85,16 @@ func TestDatabaseRecoveryDoesNotDuplicateOrReappendWAL(t *testing.T) {
 		t.Fatalf("expected replayed WAL to be truncated, size=%d", infoAfterRecovery.Size())
 	}
 
-	restarted := Create(walPath, snapshotPath)
+	restarted := Create(Options{
+		WFP: walPath,
+		FFP: snapshotPath,
+	})
 	defer restarted.Close()
 
-	rows = restarted.Get("users")
+	rows, err = restarted.Get("users")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row after second restart, got %d", len(rows))
 	}

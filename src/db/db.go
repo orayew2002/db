@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/orayew2002/db/src/fm"
+	"github.com/orayew2002/db/src/wal"
 )
 
 type Options struct {
@@ -12,11 +13,10 @@ type Options struct {
 	FFP string
 	UWC bool
 }
-
 type Database struct {
 	tables map[string]*Table
 	fm     FM
-	w      *Wal
+	w      *wal.Wal
 
 	// UWC (Use WAL Commit) indicates whether each request waits for WAL commit.
 	// When enabled, every operation calls Commit() and waits for fsync,
@@ -24,32 +24,48 @@ type Database struct {
 	uwc bool
 }
 
-// WFP -> WAl file path , FFP -> DB file path
+// Create initializes a new Database instance.
+//
+// WFP (WAL File Path) specifies the location of the write-ahead log file.
+// FFP (Full File Path) specifies the location of the full database dump file.
+//
+// Initialization flow:
+// 1. Load previously persisted data from storage into memory.
+// 2. Replay WAL (Write-Ahead Log) entries to restore the latest state.
+// 3. Flush the updated in-memory state back to persistent storage.
 func Create(o Options) *Database {
 	db := Database{
 		tables: make(map[string]*Table),
-		w:      NewWal(o.WFP),
+		w:      wal.NewWal(o.WFP),
 		fm:     fm.NewFmFullDump(o.FFP),
 		uwc:    o.UWC,
 	}
 
+	// Step 1: Load existing data from persistent storage.
 	if err := db.fm.Load(&db.tables); err != nil {
 		fmt.Println(err.Error())
 	}
 
+	// Step 2: Replay WAL entries to reconstruct the latest state.
 	if err := db.w.Replay(db.walFunction()); err != nil {
 		fmt.Println(err.Error())
-	} else if err := db.fm.Flush(db.tables); err != nil {
+	}
+
+	// Step 3: Persist the updated state to storage.
+	if err := db.fm.Flush(db.tables); err != nil {
 		fmt.Println(err.Error())
-	} else if err := db.w.Reset(); err != nil {
+	}
+
+	// Step 4: Clear WAL after successful synchronization.
+	if err := db.w.Reset(); err != nil {
 		fmt.Println(err.Error())
 	}
 
 	return &db
 }
 
-func (db *Database) walFunction() func(a action) {
-	return func(a action) {
+func (db *Database) walFunction() func(a wal.Action) {
+	return func(a wal.Action) {
 		if err := db.apply(a); err != nil {
 			fmt.Println(err.Error())
 		}
@@ -66,7 +82,7 @@ func (d *Database) CreateTable(name string, columns []string) error {
 		return nil
 	}
 
-	lsn, err := d.w.Append(CT, name, "", columns)
+	lsn, err := d.w.Append(wal.CT, name, "", columns)
 	if err != nil {
 		return err
 	}
@@ -80,31 +96,40 @@ func (d *Database) CreateTable(name string, columns []string) error {
 	return nil
 }
 
-func (d *Database) Delete(t string, col string, val any) {
-	d.checkTable(t)
-	lsn, err := d.w.Append(D, t, col, val)
+func (d *Database) Delete(t string, col string, val any) error {
+	if err := d.checkTable(t); err != nil {
+		return err
+	}
+
+	lsn, err := d.w.Append(wal.D, t, col, val)
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
 	d.applyDelete(t, col, val)
 	d.w.Commit(lsn)
+
+	return nil
 }
 
-func (d *Database) Insert(t string, v map[string]any) {
-	d.checkTable(t)
+func (d *Database) Insert(t string, v map[string]any) error {
+	if err := d.checkTable(t); err != nil {
+		return err
+	}
 
 	table := d.tables[t]
 	if len(table.Columns) != len(v) {
-		panic(errors.New("error vals count mismatching"))
+		return errors.New("error vals count mismatching")
 	}
 
-	lsn, err := d.w.Append(I, t, "", v)
+	lsn, err := d.w.Append(wal.I, t, "", v)
 	if err != nil {
-		panic(err.Error())
+		return errors.New("error append to wall file action")
 	}
 	d.applyInsert(t, v)
 	_ = d.w.Commit(lsn)
+
+	return nil
 }
 
 // Update item structure
@@ -113,40 +138,52 @@ type us struct {
 	vals vals
 }
 
-func (d *Database) Update(name string, col string, val any, v vals) {
-	d.checkTable(name)
+func (d *Database) Update(name string, col string, val any, v vals) error {
+	if err := d.checkTable(name); err != nil {
+		return err
+	}
 
 	table := d.tables[name]
 	if len(table.Columns) != len(v) {
-		panic(errors.New("error vals count mismatching"))
+		return errors.New("error vals count mismatching")
 	}
 
-	lsn, err := d.w.Append(U, name, col, us{
+	lsn, err := d.w.Append(wal.U, name, col, us{
 		val:  val,
 		vals: v,
 	})
 	if err != nil {
-		panic(err.Error())
+		return err
 	}
 
 	d.applyUpdate(name, col, val, v)
 	d.w.Commit(lsn)
+
+	return nil
 }
 
-func (d *Database) Get(name string) []map[string]any {
-	d.checkTable(name)
-	return d.tables[name].Rows
-}
-
-func (d *Database) GetColumns(name string) []string {
-	d.checkTable(name)
-	return append([]string(nil), d.tables[name].Columns...)
-}
-
-func (d *Database) checkTable(name string) {
-	if _, ext := d.tables[name]; !ext {
-		panic(errors.New("table not exists"))
+func (d *Database) Get(name string) ([]map[string]any, error) {
+	if err := d.checkTable(name); err != nil {
+		return nil, err
 	}
+
+	return d.tables[name].Rows, nil
+}
+
+func (d *Database) GetColumns(name string) ([]string, error) {
+	if err := d.checkTable(name); err != nil {
+		return nil, err
+	}
+
+	return append([]string(nil), d.tables[name].Columns...), nil
+}
+
+func (d *Database) checkTable(name string) error {
+	if _, ext := d.tables[name]; !ext {
+		return errors.New("table not exists")
+	}
+
+	return nil
 }
 
 func (d *Database) GetTables() []string {
@@ -162,24 +199,30 @@ func (d *Database) Close() {
 	d.w.Close()
 }
 
-func (d *Database) apply(a action) error {
-	switch a.A {
-	case CT:
+func (d *Database) apply(a wal.Action) error {
+	switch a.T {
+	case wal.CT:
 		d.applyCreateTable(a.Table, toStringSlice(a.Val))
 		return nil
-	case I:
+	case wal.I:
 		v, ok := a.Val.(map[string]any)
 		if !ok {
 			return errors.New("invalid insert payload")
 		}
-		d.checkTable(a.Table)
+		if err := d.checkTable(a.Table); err != nil {
+			return err
+		}
+
 		d.applyInsert(a.Table, v)
 		return nil
-	case D:
-		d.checkTable(a.Table)
+	case wal.D:
+		if err := d.checkTable(a.Table); err != nil {
+			return err
+		}
+
 		d.applyDelete(a.Table, a.Col, a.Val)
 		return nil
-	case U:
+	case wal.U:
 		m, ok := a.Val.(map[string]any)
 		if !ok {
 			return errors.New("invalid update payload")
@@ -190,11 +233,13 @@ func (d *Database) apply(a action) error {
 			return errors.New("invalid update values")
 		}
 
-		d.checkTable(a.Table)
+		if err := d.checkTable(a.Table); err != nil {
+			return err
+		}
 		d.applyUpdate(a.Table, a.Col, m["val"], vals(v))
 		return nil
 	default:
-		return fmt.Errorf("unsupported action %q", a.A)
+		return fmt.Errorf("unsupported action %q", a.T)
 	}
 }
 

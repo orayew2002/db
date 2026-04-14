@@ -17,9 +17,8 @@ func init() {
 
 func BenchmarkInsert(b *testing.B) {
 	db := Create(Options{
-		WFP: "../../database/wal.json",
-		FFP: "../../database/db.json",
-		UWC: false,
+		WFP: "../../database/wal",
+		FFP: "../../database/db",
 	})
 
 	db.CreateTable("users", []string{"id", "name", "email"})
