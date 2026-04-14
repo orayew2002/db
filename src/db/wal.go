@@ -10,17 +10,20 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	lp "github.com/orayew2002/db/src/proto"
+	"google.golang.org/protobuf/proto"
 )
 
-type Action string
+type Action uint32
 
 const (
-	I  Action = "insert"
-	D  Action = "delete"
-	U  Action = "update"
-	CT Action = "create_table"
-	UT Action = "update_table"
-	DT Action = "delete_table"
+	I Action = iota
+	D
+	U
+	CT
+	UT
+	DT
 )
 
 type Wal struct {
@@ -89,15 +92,15 @@ func (w *Wal) Append(a Action, table, col string, val any) (uint64, error) {
 	w.lsn++
 	lsn := w.lsn
 
-	entry := action{
-		LSN:   lsn,
-		A:     a,
-		Table: table,
-		Col:   col,
-		Val:   val,
+	entry := &lp.WalRecord{
+		Lsn:     lsn,
+		Op:      uint32(a),
+		TableId: 1,
+		ColId:   1,
+		Value:   nil,
 	}
 
-	b, err := json.Marshal(entry)
+	b, err := proto.Marshal(entry)
 	if err != nil {
 		return 0, err
 	}

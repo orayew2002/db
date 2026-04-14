@@ -7,18 +7,30 @@ import (
 	"github.com/orayew2002/db/src/fm"
 )
 
+type Options struct {
+	WFP string
+	FFP string
+	UWC bool
+}
+
 type Database struct {
 	tables map[string]*Table
 	fm     FM
 	w      *Wal
+
+	// UWC (Use WAL Commit) indicates whether each request waits for WAL commit.
+	// When enabled, every operation calls Commit() and waits for fsync,
+	// providing strong durability guarantees but significantly reducing performance.
+	uwc bool
 }
 
 // WFP -> WAl file path , FFP -> DB file path
-func Create(wfp, ffp string) *Database {
+func Create(o Options) *Database {
 	db := Database{
 		tables: make(map[string]*Table),
-		w:      NewWal(wfp),
-		fm:     fm.NewFmFullDump(ffp),
+		w:      NewWal(o.WFP),
+		fm:     fm.NewFmFullDump(o.FFP),
+		uwc:    o.UWC,
 	}
 
 	if err := db.fm.Load(&db.tables); err != nil {
@@ -61,7 +73,11 @@ func (d *Database) CreateTable(name string, columns []string) error {
 
 	d.applyCreateTable(name, columns)
 
-	return d.w.Commit(lsn)
+	if d.uwc {
+		return d.w.Commit(lsn)
+	}
+
+	return nil
 }
 
 func (d *Database) Delete(t string, col string, val any) {

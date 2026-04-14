@@ -50,6 +50,9 @@ func (c *CLI) Run() {
 
 		case Get:
 			c.get(line)
+
+		case CommandNotFound:
+			fmt.Print("command not found")
 		}
 	}
 }
