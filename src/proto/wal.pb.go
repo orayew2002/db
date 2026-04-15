@@ -26,8 +26,7 @@ type WalRecord struct {
 	Lsn           uint64                 `protobuf:"varint,1,opt,name=lsn,proto3" json:"lsn,omitempty"`
 	Op            uint32                 `protobuf:"varint,2,opt,name=op,proto3" json:"op,omitempty"`
 	TableId       uint32                 `protobuf:"varint,3,opt,name=table_id,json=tableId,proto3" json:"table_id,omitempty"`
-	ColId         uint32                 `protobuf:"varint,4,opt,name=col_id,json=colId,proto3" json:"col_id,omitempty"`
-	Value         *Value                 `protobuf:"bytes,5,opt,name=value,proto3" json:"value,omitempty"`
+	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -83,168 +82,23 @@ func (x *WalRecord) GetTableId() uint32 {
 	return 0
 }
 
-func (x *WalRecord) GetColId() uint32 {
+func (x *WalRecord) GetData() []byte {
 	if x != nil {
-		return x.ColId
-	}
-	return 0
-}
-
-func (x *WalRecord) GetValue() *Value {
-	if x != nil {
-		return x.Value
+		return x.Data
 	}
 	return nil
 }
-
-type Value struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Kind:
-	//
-	//	*Value_I64
-	//	*Value_F64
-	//	*Value_Str
-	//	*Value_Raw
-	//	*Value_B
-	Kind          isValue_Kind `protobuf_oneof:"kind"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Value) Reset() {
-	*x = Value{}
-	mi := &file_src_proto_wal_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Value) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Value) ProtoMessage() {}
-
-func (x *Value) ProtoReflect() protoreflect.Message {
-	mi := &file_src_proto_wal_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Value.ProtoReflect.Descriptor instead.
-func (*Value) Descriptor() ([]byte, []int) {
-	return file_src_proto_wal_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *Value) GetKind() isValue_Kind {
-	if x != nil {
-		return x.Kind
-	}
-	return nil
-}
-
-func (x *Value) GetI64() int64 {
-	if x != nil {
-		if x, ok := x.Kind.(*Value_I64); ok {
-			return x.I64
-		}
-	}
-	return 0
-}
-
-func (x *Value) GetF64() float64 {
-	if x != nil {
-		if x, ok := x.Kind.(*Value_F64); ok {
-			return x.F64
-		}
-	}
-	return 0
-}
-
-func (x *Value) GetStr() string {
-	if x != nil {
-		if x, ok := x.Kind.(*Value_Str); ok {
-			return x.Str
-		}
-	}
-	return ""
-}
-
-func (x *Value) GetRaw() []byte {
-	if x != nil {
-		if x, ok := x.Kind.(*Value_Raw); ok {
-			return x.Raw
-		}
-	}
-	return nil
-}
-
-func (x *Value) GetB() bool {
-	if x != nil {
-		if x, ok := x.Kind.(*Value_B); ok {
-			return x.B
-		}
-	}
-	return false
-}
-
-type isValue_Kind interface {
-	isValue_Kind()
-}
-
-type Value_I64 struct {
-	I64 int64 `protobuf:"varint,1,opt,name=i64,proto3,oneof"`
-}
-
-type Value_F64 struct {
-	F64 float64 `protobuf:"fixed64,2,opt,name=f64,proto3,oneof"`
-}
-
-type Value_Str struct {
-	Str string `protobuf:"bytes,3,opt,name=str,proto3,oneof"`
-}
-
-type Value_Raw struct {
-	Raw []byte `protobuf:"bytes,4,opt,name=raw,proto3,oneof"`
-}
-
-type Value_B struct {
-	B bool `protobuf:"varint,5,opt,name=b,proto3,oneof"`
-}
-
-func (*Value_I64) isValue_Kind() {}
-
-func (*Value_F64) isValue_Kind() {}
-
-func (*Value_Str) isValue_Kind() {}
-
-func (*Value_Raw) isValue_Kind() {}
-
-func (*Value_B) isValue_Kind() {}
 
 var File_src_proto_wal_proto protoreflect.FileDescriptor
 
 const file_src_proto_wal_proto_rawDesc = "" +
 	"\n" +
-	"\x13src/proto/wal.proto\x12\x05proto\"\x83\x01\n" +
+	"\x13src/proto/wal.proto\x12\x05proto\"\\\n" +
 	"\tWalRecord\x12\x10\n" +
 	"\x03lsn\x18\x01 \x01(\x04R\x03lsn\x12\x0e\n" +
 	"\x02op\x18\x02 \x01(\rR\x02op\x12\x19\n" +
-	"\btable_id\x18\x03 \x01(\rR\atableId\x12\x15\n" +
-	"\x06col_id\x18\x04 \x01(\rR\x05colId\x12\"\n" +
-	"\x05value\x18\x05 \x01(\v2\f.proto.ValueR\x05value\"o\n" +
-	"\x05Value\x12\x12\n" +
-	"\x03i64\x18\x01 \x01(\x03H\x00R\x03i64\x12\x12\n" +
-	"\x03f64\x18\x02 \x01(\x01H\x00R\x03f64\x12\x12\n" +
-	"\x03str\x18\x03 \x01(\tH\x00R\x03str\x12\x12\n" +
-	"\x03raw\x18\x04 \x01(\fH\x00R\x03raw\x12\x0e\n" +
-	"\x01b\x18\x05 \x01(\bH\x00R\x01bB\x06\n" +
-	"\x04kindB\x13Z\x11./src/proto;protob\x06proto3"
+	"\btable_id\x18\x03 \x01(\rR\atableId\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04dataB\x13Z\x11./src/proto;protob\x06proto3"
 
 var (
 	file_src_proto_wal_proto_rawDescOnce sync.Once
@@ -258,18 +112,16 @@ func file_src_proto_wal_proto_rawDescGZIP() []byte {
 	return file_src_proto_wal_proto_rawDescData
 }
 
-var file_src_proto_wal_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_src_proto_wal_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_src_proto_wal_proto_goTypes = []any{
 	(*WalRecord)(nil), // 0: proto.WalRecord
-	(*Value)(nil),     // 1: proto.Value
 }
 var file_src_proto_wal_proto_depIdxs = []int32{
-	1, // 0: proto.WalRecord.value:type_name -> proto.Value
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_src_proto_wal_proto_init() }
@@ -277,20 +129,13 @@ func file_src_proto_wal_proto_init() {
 	if File_src_proto_wal_proto != nil {
 		return
 	}
-	file_src_proto_wal_proto_msgTypes[1].OneofWrappers = []any{
-		(*Value_I64)(nil),
-		(*Value_F64)(nil),
-		(*Value_Str)(nil),
-		(*Value_Raw)(nil),
-		(*Value_B)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_src_proto_wal_proto_rawDesc), len(file_src_proto_wal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

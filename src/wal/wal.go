@@ -91,7 +91,12 @@ func (w *Wal) writerLoop() {
 	}
 }
 
-func (w *Wal) Append(a T, table, col string, val any) (uint64, error) {
+type Arg interface {
+	Raw() []byte
+	Vals() []string
+}
+
+func (w *Wal) Append(a T, table string, arg Arg) (uint64, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -99,7 +104,18 @@ func (w *Wal) Append(a T, table, col string, val any) (uint64, error) {
 		return 0, errors.New("wal closed")
 	}
 
-	fmt.Println(a, table, col, val)
+	if a == CT {
+		if err := w.catalog.Write(table); err != nil {
+			return 0, fmt.Errorf("error add field to wal catalog: %w", err)
+		}
+
+		for _, v := range arg.Vals() {
+			if err := w.catalog.Write(v); err != nil {
+				return 0, fmt.Errorf("error add field to wal catalog: %w", err)
+			}
+		}
+	}
+
 	w.lsn++
 	lsn := w.lsn
 
@@ -107,17 +123,16 @@ func (w *Wal) Append(a T, table, col string, val any) (uint64, error) {
 		Lsn:     lsn,
 		Op:      uint32(a),
 		TableId: w.catalog.GetID(table),
-		ColId:   1,
-		Value:   nil,
+		Data:    arg.Raw(),
 	}
 
 	b, err := proto.Marshal(entry)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("error marhsal proto file: %w", err)
 	}
 
 	if err := binary.Write(w.buf, binary.LittleEndian, uint32(len(b))); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("error write marshaled data to file: %w", err)
 	}
 
 	if _, err := w.buf.Write(b); err != nil {
@@ -153,43 +168,69 @@ func (w *Wal) flush() {
 }
 
 func (w *Wal) Replay(handler func(a Action)) error {
-	// Flush and seek under the lock to avoid racing with writerLoop.
 	w.mu.Lock()
-	_ = w.buf.Flush()
-	_, err := w.f.Seek(0, 0)
-	w.mu.Unlock()
+	defer w.mu.Unlock()
 
-	if err != nil {
+	if _, err := w.f.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
 
-	reader := bufio.NewReader(w.f)
-
 	for {
 		var size uint32
-		if err := binary.Read(reader, binary.LittleEndian, &size); err != nil {
+		if err := binary.Read(w.f, binary.LittleEndian, &size); err != nil {
 			if err == io.EOF {
 				break
 			}
 			return err
 		}
 
-		data := make([]byte, size)
-		if _, err := io.ReadFull(reader, data); err != nil {
+		buf := make([]byte, size)
+		if _, err := io.ReadFull(w.f, buf); err != nil {
 			return err
 		}
 
-		var act Action
-		if err := json.Unmarshal(data, &act); err == nil {
-			handler(act) // SAFE: no mutex held
+		var rec lp.WalRecord
+		if err := proto.Unmarshal(buf, &rec); err != nil {
+			return err
 		}
+
+		// 4. build action from record
+		action, err := w.buildAction(&rec)
+		if err != nil {
+			return err
+		}
+
+		handler(action)
 	}
 
-	w.mu.Lock()
-	_, err = w.f.Seek(0, io.SeekEnd)
-	w.mu.Unlock()
-
+	_, err := w.f.Seek(0, io.SeekEnd)
 	return err
+}
+
+func (w *Wal) buildAction(rec *lp.WalRecord) (Action, error) {
+	var data any
+
+	switch T(rec.Op) {
+
+	case CT:
+		var ct lp.CreateTable
+		if err := proto.Unmarshal(rec.GetData(), &ct); err != nil {
+			return Action{}, err
+		}
+		data = ct.GetVals()
+
+		// TODO
+		// case INSERT:
+		// case UPDATE:
+		// case DELETE:
+	}
+
+	return Action{
+		LSN:   rec.Lsn,
+		T:     T(rec.Op),
+		Table: w.catalog.GetName(rec.TableId),
+		Val:   data,
+	}, nil
 }
 
 func (w *Wal) recoverLSN() {

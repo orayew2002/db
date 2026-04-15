@@ -40,7 +40,8 @@ import (
 type Catalog struct {
 	m  *sync.Mutex       // protects concurrent access
 	f  *os.File          // underlying catalog file
-	v  map[string]uint32 // in-memory index: value -> id
+	vi map[string]uint32 // in-memory index: value -> id
+	iv map[uint32]string // in-memory index: id -> value
 	cs *lp.Catalogs      // full snapshot stored in memory
 	i  uint32            // next available ID
 }
@@ -88,7 +89,8 @@ func (c *Catalog) Load() error {
 	// If file is empty, initialize fresh state
 	if stat.Size() == 0 {
 		c.cs = &lp.Catalogs{}
-		c.v = make(map[string]uint32)
+		c.vi = make(map[string]uint32)
+		c.iv = make(map[uint32]string)
 		c.i = 1
 		return nil
 	}
@@ -108,12 +110,14 @@ func (c *Catalog) Load() error {
 
 	// Restore in-memory structures
 	c.cs = &data
-	c.v = make(map[string]uint32)
+	c.vi = make(map[string]uint32)
+	c.iv = make(map[uint32]string)
 
 	var maxID uint32 = 0
 
 	for _, item := range data.Catalogs {
-		c.v[item.Value] = item.Id
+		c.vi[item.Value] = item.Id
+		c.iv[item.Id] = item.Value
 
 		if item.Id > maxID {
 			maxID = item.Id
@@ -142,7 +146,7 @@ func (c *Catalog) Write(val string) error {
 	defer c.m.Unlock()
 
 	// Avoid duplicates
-	if _, exists := c.v[val]; exists {
+	if _, exists := c.vi[val]; exists {
 		return nil
 	}
 
@@ -179,7 +183,7 @@ func (c *Catalog) Write(val string) error {
 	}
 
 	// Update memory state only after successful disk write
-	c.v[val] = c.i
+	c.vi[val] = c.i
 	c.incrementID()
 
 	return nil
@@ -199,7 +203,7 @@ func (c *Catalog) incrementID() {
 // Note: 0 is considered "not found".
 func (c *Catalog) GetID(v string) uint32 {
 	for range 2 {
-		if id, exists := c.v[v]; exists {
+		if id, exists := c.vi[v]; exists {
 			return id
 		}
 
@@ -207,4 +211,19 @@ func (c *Catalog) GetID(v string) uint32 {
 	}
 
 	return 0
+}
+
+// GetName returns the name for a given ID.
+//
+// Returns:
+//   - name if exists
+//   - empty string if not found
+//
+// Note: empty string ("") is considered "not found".
+func (c *Catalog) GetName(id uint32) string {
+	if v, exists := c.iv[id]; exists {
+		return v
+	}
+
+	return ""
 }

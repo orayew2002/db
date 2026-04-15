@@ -128,6 +128,10 @@ func (c *CLI) showTables() {
 
 func (c *CLI) createTable(cmd string) {
 	flags := strings.Split(cmd, " ")
+	if len(flags) != 4 {
+		fmt.Println("not correct arguments count need be 4")
+		return
+	}
 
 	table := flags[2]
 	rows := strings.Split(strings.Trim(flags[3], "()"), ",")

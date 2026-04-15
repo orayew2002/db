@@ -7,16 +7,5 @@ message WalRecord {
   uint64 lsn = 1;
   uint32 op = 2;
   uint32 table_id = 3;
-  uint32 col_id = 4;
-  Value  value = 5;
-}
-
-message Value {
-  oneof kind {
-    int64 i64 = 1;
-    double f64 = 2;
-    string str = 3;
-    bytes raw = 4;
-    bool b = 5;
-  }
+  bytes data = 4; 
 }

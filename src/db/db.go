@@ -82,7 +82,7 @@ func (d *Database) CreateTable(name string, columns []string) error {
 		return nil
 	}
 
-	lsn, err := d.w.Append(wal.CT, name, "", columns)
+	lsn, err := d.w.Append(wal.CT, name, CreateTable{columns})
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (d *Database) Delete(t string, col string, val any) error {
 		return err
 	}
 
-	lsn, err := d.w.Append(wal.D, t, col, val)
+	lsn, err := d.w.Append(wal.D, t, Delete{col, val})
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (d *Database) Insert(t string, v map[string]any) error {
 		return errors.New("error vals count mismatching")
 	}
 
-	lsn, err := d.w.Append(wal.I, t, "", v)
+	lsn, err := d.w.Append(wal.I, t, Insert{v})
 	if err != nil {
 		return errors.New("error append to wall file action")
 	}
@@ -130,12 +130,6 @@ func (d *Database) Insert(t string, v map[string]any) error {
 	_ = d.w.Commit(lsn)
 
 	return nil
-}
-
-// Update item structure
-type us struct {
-	val  any
-	vals vals
 }
 
 func (d *Database) Update(name string, col string, val any, v vals) error {
@@ -148,10 +142,7 @@ func (d *Database) Update(name string, col string, val any, v vals) error {
 		return errors.New("error vals count mismatching")
 	}
 
-	lsn, err := d.w.Append(wal.U, name, col, us{
-		val:  val,
-		vals: v,
-	})
+	lsn, err := d.w.Append(wal.U, name, Update{col, val, v})
 	if err != nil {
 		return err
 	}
@@ -204,6 +195,7 @@ func (d *Database) apply(a wal.Action) error {
 	case wal.CT:
 		d.applyCreateTable(a.Table, toStringSlice(a.Val))
 		return nil
+
 	case wal.I:
 		v, ok := a.Val.(map[string]any)
 		if !ok {
