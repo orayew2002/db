@@ -111,6 +111,59 @@ func (x *Insert) GetVal() map[string]*structpb.Value {
 	return nil
 }
 
+type Delete struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Col string          `protobuf:"bytes,1,opt,name=col,proto3" json:"col,omitempty"`
+	Val *structpb.Value `protobuf:"bytes,2,opt,name=val,proto3" json:"val,omitempty"`
+}
+
+func (x *Delete) Reset() {
+	*x = Delete{}
+	mi := &file_src_proto_arg_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Delete) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Delete) ProtoMessage() {}
+
+func (x *Delete) ProtoReflect() protoreflect.Message {
+	mi := &file_src_proto_arg_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Delete.ProtoReflect.Descriptor instead.
+func (*Delete) Descriptor() ([]byte, []int) {
+	return file_src_proto_arg_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Delete) GetCol() string {
+	if x != nil {
+		return x.Col
+	}
+	return ""
+}
+
+func (x *Delete) GetVal() *structpb.Value {
+	if x != nil {
+		return x.Val
+	}
+	return nil
+}
+
 var File_src_proto_arg_proto protoreflect.FileDescriptor
 
 var file_src_proto_arg_proto_rawDesc = []byte{
@@ -128,8 +181,13 @@ var file_src_proto_arg_proto_rawDesc = []byte{
 	0x12, 0x2c, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32,
 	0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
 	0x66, 0x2e, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
-	0x38, 0x01, 0x42, 0x13, 0x5a, 0x11, 0x2e, 0x2f, 0x73, 0x72, 0x63, 0x2f, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x38, 0x01, 0x22, 0x44, 0x0a, 0x06, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x12, 0x10, 0x0a, 0x03,
+	0x63, 0x6f, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x63, 0x6f, 0x6c, 0x12, 0x28,
+	0x0a, 0x03, 0x76, 0x61, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x67, 0x6f,
+	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x56, 0x61,
+	0x6c, 0x75, 0x65, 0x52, 0x03, 0x76, 0x61, 0x6c, 0x42, 0x13, 0x5a, 0x11, 0x2e, 0x2f, 0x73, 0x72,
+	0x63, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x3b, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -144,21 +202,23 @@ func file_src_proto_arg_proto_rawDescGZIP() []byte {
 	return file_src_proto_arg_proto_rawDescData
 }
 
-var file_src_proto_arg_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_src_proto_arg_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_src_proto_arg_proto_goTypes = []any{
 	(*CreateTable)(nil),    // 0: proto.CreateTable
 	(*Insert)(nil),         // 1: proto.Insert
-	nil,                    // 2: proto.Insert.ValEntry
-	(*structpb.Value)(nil), // 3: google.protobuf.Value
+	(*Delete)(nil),         // 2: proto.Delete
+	nil,                    // 3: proto.Insert.ValEntry
+	(*structpb.Value)(nil), // 4: google.protobuf.Value
 }
 var file_src_proto_arg_proto_depIdxs = []int32{
-	2, // 0: proto.Insert.val:type_name -> proto.Insert.ValEntry
-	3, // 1: proto.Insert.ValEntry.value:type_name -> google.protobuf.Value
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 0: proto.Insert.val:type_name -> proto.Insert.ValEntry
+	4, // 1: proto.Delete.val:type_name -> google.protobuf.Value
+	4, // 2: proto.Insert.ValEntry.value:type_name -> google.protobuf.Value
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_src_proto_arg_proto_init() }
@@ -172,7 +232,7 @@ func file_src_proto_arg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_src_proto_arg_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -31,7 +31,13 @@ type Delete struct {
 }
 
 func (d Delete) Raw() []byte {
-	return nil
+	v, _ := shared.Marshal(d.Val)
+	raw, err := proto.Marshal(&lp.Delete{Col: d.Col, Val: v})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return raw
 }
 
 func (d Delete) Vals() []string {
@@ -43,7 +49,7 @@ type Insert struct {
 }
 
 func (i Insert) Raw() []byte {
-	converted, err := shared.Marshal(i.Val)
+	converted, err := shared.MarshalMap(i.Val)
 	if err != nil {
 		panic(err.Error())
 	}

@@ -12,3 +12,8 @@ message CreateTable{
 message Insert {
   map<string, google.protobuf.Value> val = 1;
 }
+
+message Delete {
+  string col = 1;
+  google.protobuf.Value val = 2;
+}

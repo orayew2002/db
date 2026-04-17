@@ -207,36 +207,41 @@ func (w *Wal) Replay(handler func(a Action)) error {
 }
 
 func (w *Wal) buildAction(rec *lp.WalRecord) (Action, error) {
-	var data any
+	a := Action{
+		LSN:   rec.Lsn,
+		T:     T(rec.Op),
+		Table: w.catalog.GetName(rec.TableId),
+	}
 
 	switch T(rec.Op) {
-
 	case CT:
 		var ct lp.CreateTable
 		if err := proto.Unmarshal(rec.GetData(), &ct); err != nil {
 			return Action{}, err
 		}
-		data = ct.GetVals()
+		a.Val = ct.GetVals()
 
 	case I:
 		var d lp.Insert
 		if err := proto.Unmarshal(rec.GetData(), &d); err != nil {
 			return Action{}, err
 		}
-		data = shared.Unmarshal(d.Val)
+		a.Val = shared.UnmarshalMap(d.Val)
+
+	case D:
+		var d lp.Delete
+		if err := proto.Unmarshal(rec.Data, &d); err != nil {
+			return Action{}, err
+		}
+
+		a.Val = shared.Unmarshal(d.GetVal())
+		a.Col = d.GetCol()
 
 		// TODO
-		// case INSERT:
 		// case UPDATE:
-		// case DELETE:
 	}
 
-	return Action{
-		LSN:   rec.Lsn,
-		T:     T(rec.Op),
-		Table: w.catalog.GetName(rec.TableId),
-		Val:   data,
-	}, nil
+	return a, nil
 }
 
 func (w *Wal) recoverLSN() {
