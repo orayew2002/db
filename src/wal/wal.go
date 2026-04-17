@@ -3,7 +3,6 @@ package wal
 import (
 	"bufio"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -177,7 +176,7 @@ func (w *Wal) Replay(handler func(a Action)) error {
 	for {
 		var size uint32
 		if err := binary.Read(w.f, binary.LittleEndian, &size); err != nil {
-			if err == io.EOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				break
 			}
 			return err
@@ -185,12 +184,15 @@ func (w *Wal) Replay(handler func(a Action)) error {
 
 		buf := make([]byte, size)
 		if _, err := io.ReadFull(w.f, buf); err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				break
+			}
 			return err
 		}
 
 		var rec lp.WalRecord
 		if err := proto.Unmarshal(buf, &rec); err != nil {
-			return err
+			break
 		}
 
 		// 4. build action from record
@@ -275,13 +277,13 @@ func (w *Wal) recoverLSN() {
 			break
 		}
 
-		var act Action
-		if err := json.Unmarshal(data, &act); err != nil {
+		var rec lp.WalRecord
+		if err := proto.Unmarshal(data, &rec); err != nil {
 			continue
 		}
 
-		if act.LSN > last {
-			last = act.LSN
+		if rec.GetLsn() > last {
+			last = rec.GetLsn()
 		}
 	}
 
@@ -300,7 +302,14 @@ func (w *Wal) Close() error {
 	w.closed = true
 
 	_ = w.buf.Flush()
-	return w.f.Sync()
+	if err := w.f.Sync(); err != nil {
+		return err
+	}
+	if err := w.catalog.Close(); err != nil {
+		return err
+	}
+
+	return w.f.Close()
 }
 
 func (w *Wal) Reset() error {

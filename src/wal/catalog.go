@@ -184,6 +184,7 @@ func (c *Catalog) Write(val string) error {
 
 	// Update memory state only after successful disk write
 	c.vi[val] = c.i
+	c.iv[c.i] = val
 	c.incrementID()
 
 	return nil
@@ -202,15 +203,21 @@ func (c *Catalog) incrementID() {
 //
 // Note: 0 is considered "not found".
 func (c *Catalog) GetID(v string) uint32 {
-	for range 2 {
-		if id, exists := c.vi[v]; exists {
-			return id
-		}
+	c.m.Lock()
+	if id, exists := c.vi[v]; exists {
+		c.m.Unlock()
+		return id
+	}
+	c.m.Unlock()
 
-		_ = c.Write(v)
+	if err := c.Write(v); err != nil {
+		return 0
 	}
 
-	return 0
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	return c.vi[v]
 }
 
 // GetName returns the name for a given ID.
@@ -221,9 +228,19 @@ func (c *Catalog) GetID(v string) uint32 {
 //
 // Note: empty string ("") is considered "not found".
 func (c *Catalog) GetName(id uint32) string {
+	c.m.Lock()
+	defer c.m.Unlock()
+
 	if v, exists := c.iv[id]; exists {
 		return v
 	}
 
 	return ""
+}
+
+func (c *Catalog) Close() error {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	return c.f.Close()
 }

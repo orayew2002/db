@@ -30,7 +30,7 @@ A lightweight embedded database written in Go. It stores data in memory, persist
 | Component | File | Role |
 |-----------|------|------|
 | `Database` | `src/db/db.go` | Top-level coordinator. Owns tables, WAL, and file manager |
-| `WAL` | `src/db/wal.go` | Append-only binary log. Guarantees durability before in-memory apply |
+| `WAL` | `src/wal/wal.go` | Append-only binary log. Guarantees durability before in-memory apply |
 | `FmFullDump` | `src/fm/full_dump.go` | Persistence layer. Atomically snapshots all tables to a JSON file |
 | `Table` | `src/db/table.go` | In-memory table. Supports insert, delete (filter-copy), and update |
 | `CLI` | `src/cli/` | Interactive shell with SQL-like syntax |
@@ -73,9 +73,9 @@ Each entry is length-prefixed:
 
 ```
 ┌──────────────┬──────────────────────────────┐
-│ size: uint32 │ JSON payload (action struct)  │
-│  (4 bytes)   │  { lsn, action, table, col,  │
-│ little-endian│    val }                      │
+│ size: uint32 │ protobuf WAL record           │
+│  (4 bytes)   │  { lsn, op, table_id, data }  │
+│ little-endian│    data = op-specific payload │
 └──────────────┴──────────────────────────────┘
 ```
 
@@ -97,9 +97,10 @@ Actions: `insert` · `delete` · `update` · `create_table` · `update_table` ·
 import "github.com/orayew2002/db/src/db"
 
 // Open (or create) a database.
-// First argument  = WAL file path
-// Second argument = snapshot file path
-database := db.Create("database/wal.json", "database/db.json")
+database := db.Create(db.Options{
+    WFP: "database/wal",
+    FFP: "database/db",
+})
 defer database.Close()
 
 // Create a table
@@ -118,11 +119,10 @@ rows := database.Get("users")
 // Delete by column value
 database.Delete("users", "id", "u1")
 
-// Update rows matching a condition
+// Update rows matching a condition.
+// Only listed fields are changed.
 database.Update("users", "id", "u1", map[string]any{
-    "id":    "u1",
-    "name":  "Alice Smith",
-    "email": "alice@example.com",
+    "name": "Alice Smith",
 })
 
 // List all table names
@@ -138,11 +138,40 @@ go run ./cmd/cli
 ```
 db> SHOW TABLES
 db> CREATE TABLE users (id,name,email)
-db> INSERT INTO users (id=u1,name=Alice,email=alice@example.com)
+db> INSERT INTO users (id='u1',name='Alice',email='alice@example.com')
 db> SELECT * FROM users
-db> DELETE FROM users WHERE id=u1
+db> UPDATE users SET name='Alice Smith' WHERE id='u1'
+db> DELETE FROM users WHERE id='u1'
 db> exit
 ```
+
+### SQL-like query examples
+
+The CLI supports this SQL-like command set:
+
+```sql
+SHOW TABLES
+
+CREATE TABLE users (id,name,email,active)
+
+INSERT INTO users (id='u1',name='Alice',email='alice@example.com',active=true)
+INSERT INTO users (id='u2',name='Bob',email='bob@example.com',active=false)
+
+SELECT * FROM users
+
+UPDATE users SET name='Alice Smith' WHERE id='u1'
+UPDATE users SET email='alice@company.dev',active=false WHERE id='u1'
+
+DELETE FROM users WHERE id='u2'
+```
+
+CLI value parsing rules:
+
+- Strings can be quoted with `'value'` or `"value"`.
+- Numbers like `42` and `3.14` are parsed as numbers.
+- `true` and `false` are parsed as booleans.
+- `NULL` is parsed as `nil`.
+- `UPDATE` changes only the columns listed in the `SET` clause.
 
 ### Seed tool
 

@@ -97,7 +97,11 @@ func (d *Database) CreateTable(name string, columns []string) error {
 }
 
 func (d *Database) Delete(t string, col string, val any) error {
-	if err := d.checkTable(t); err != nil {
+	table, err := d.table(t)
+	if err != nil {
+		return err
+	}
+	if err := requireKnownColumns(table, col); err != nil {
 		return err
 	}
 
@@ -113,13 +117,13 @@ func (d *Database) Delete(t string, col string, val any) error {
 }
 
 func (d *Database) Insert(t string, v map[string]any) error {
-	if err := d.checkTable(t); err != nil {
+	table, err := d.table(t)
+	if err != nil {
 		return err
 	}
 
-	table := d.tables[t]
-	if len(table.Columns) != len(v) {
-		return errors.New("error vals count mismatching")
+	if err := requireInsertColumns(table, v); err != nil {
+		return err
 	}
 
 	lsn, err := d.w.Append(wal.I, t, Insert{v})
@@ -132,14 +136,17 @@ func (d *Database) Insert(t string, v map[string]any) error {
 	return nil
 }
 
-func (d *Database) Update(name string, col string, val any, v vals) error {
-	if err := d.checkTable(name); err != nil {
+func (d *Database) Update(name string, col string, val any, v map[string]any) error {
+	table, err := d.table(name)
+	if err != nil {
 		return err
 	}
 
-	table := d.tables[name]
-	if len(table.Columns) != len(v) {
-		return errors.New("error vals count mismatching")
+	if err := requireKnownColumns(table, col); err != nil {
+		return err
+	}
+	if err := requireUpdateColumns(table, v); err != nil {
+		return err
 	}
 
 	lsn, err := d.w.Append(wal.U, name, Update{col, val, v})
@@ -201,14 +208,22 @@ func (d *Database) apply(a wal.Action) error {
 		if !ok {
 			return errors.New("invalid insert payload")
 		}
-		if err := d.checkTable(a.Table); err != nil {
+		table, err := d.table(a.Table)
+		if err != nil {
+			return err
+		}
+		if err := requireInsertColumns(table, v); err != nil {
 			return err
 		}
 
 		d.applyInsert(a.Table, v)
 		return nil
 	case wal.D:
-		if err := d.checkTable(a.Table); err != nil {
+		table, err := d.table(a.Table)
+		if err != nil {
+			return err
+		}
+		if err := requireKnownColumns(table, a.Col); err != nil {
 			return err
 		}
 
@@ -225,10 +240,17 @@ func (d *Database) apply(a wal.Action) error {
 			return errors.New("invalid update values")
 		}
 
-		if err := d.checkTable(a.Table); err != nil {
+		table, err := d.table(a.Table)
+		if err != nil {
 			return err
 		}
-		d.applyUpdate(a.Table, a.Col, m["val"], vals(v))
+		if err := requireKnownColumns(table, a.Col); err != nil {
+			return err
+		}
+		if err := requireUpdateColumns(table, v); err != nil {
+			return err
+		}
+		d.applyUpdate(a.Table, a.Col, m["val"], v)
 		return nil
 	default:
 		return fmt.Errorf("unsupported action %q", a.T)
@@ -254,26 +276,8 @@ func (d *Database) applyInsert(table string, v map[string]any) {
 	d.tables[table].Insert(mapToRow(v, d.tables[table].Columns))
 }
 
-func (d *Database) applyUpdate(table string, col string, val any, v vals) {
-	d.tables[table].Update(col, val, v.toRow(d.tables[table].Columns))
-}
-
-type vals map[string]any
-
-func (v vals) toRow(cols []string) Row {
-	row := make(Row, len(cols))
-
-	for _, key := range cols {
-		var val any
-
-		if v, ext := v[key]; ext {
-			val = v
-		}
-
-		row[key] = val
-	}
-
-	return row
+func (d *Database) applyUpdate(table string, col string, val any, v map[string]any) {
+	d.tables[table].Update(col, val, v)
 }
 
 func mapToRow(v map[string]any, cols []string) Row {
@@ -318,4 +322,63 @@ func toStringSlice(v any) []string {
 	default:
 		return []string{fmt.Sprintf("%v", val)}
 	}
+}
+
+func (d *Database) table(name string) (*Table, error) {
+	table, ok := d.tables[name]
+	if !ok {
+		return nil, errors.New("table not exists")
+	}
+
+	return table, nil
+}
+
+func requireInsertColumns(table *Table, values map[string]any) error {
+	if len(values) != len(table.Columns) {
+		return errors.New("error vals count mismatching")
+	}
+
+	if err := requireKnownColumns(table, mapKeys(values)...); err != nil {
+		return err
+	}
+
+	for _, column := range table.Columns {
+		if _, ok := values[column]; !ok {
+			return fmt.Errorf("missing column %q", column)
+		}
+	}
+
+	return nil
+}
+
+func requireUpdateColumns(table *Table, values map[string]any) error {
+	if len(values) == 0 {
+		return errors.New("update requires at least one column")
+	}
+
+	return requireKnownColumns(table, mapKeys(values)...)
+}
+
+func requireKnownColumns(table *Table, columns ...string) error {
+	known := make(map[string]struct{}, len(table.Columns))
+	for _, column := range table.Columns {
+		known[column] = struct{}{}
+	}
+
+	for _, column := range columns {
+		if _, ok := known[column]; !ok {
+			return fmt.Errorf("unknown column %q", column)
+		}
+	}
+
+	return nil
+}
+
+func mapKeys(values map[string]any) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	return keys
 }

@@ -86,10 +86,19 @@ func (t *Table) Delete(col string, val any) {
 	t.Rows = t.Rows[:n]
 }
 
-func (t *Table) Update(col string, val any, r Row) {
+func (t *Table) Update(col string, val any, changes map[string]any) {
 	for i, row := range t.Rows {
 		if rv, ext := row[col]; ext && equalValues(rv, val) {
-			t.Rows[i] = r
+			next := make(Row, len(row))
+			for key, current := range row {
+				next[key] = current
+			}
+
+			for key, current := range changes {
+				next[key] = current
+			}
+
+			t.Rows[i] = next
 		}
 	}
 }
