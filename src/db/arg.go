@@ -1,7 +1,8 @@
 package db
 
 import (
-	lb "github.com/orayew2002/db/src/proto"
+	lp "github.com/orayew2002/db/src/proto"
+	"github.com/orayew2002/db/src/shared"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -10,7 +11,7 @@ type CreateTable struct {
 }
 
 func (c CreateTable) Raw() []byte {
-	s := lb.CreateTable{Vals: c.Vals()}
+	s := lp.CreateTable{Vals: c.Vals()}
 
 	b, err := proto.Marshal(&s)
 	if err != nil {
@@ -42,7 +43,17 @@ type Insert struct {
 }
 
 func (i Insert) Raw() []byte {
-	return nil
+	converted, err := shared.Marshal(i.Val)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	raw, err := proto.Marshal(&lp.Insert{Val: converted})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return raw
 }
 
 func (i Insert) Vals() []string {

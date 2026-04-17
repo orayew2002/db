@@ -8,7 +8,7 @@ A lightweight embedded database written in Go. It stores data in memory, persist
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                      Database                        │
+│                      Database                       │
 │                                                     │
 │   ┌──────────────┐     ┌──────────────────────────┐ │
 │   │  In-Memory   │     │   WAL (Write-Ahead Log)  │ │

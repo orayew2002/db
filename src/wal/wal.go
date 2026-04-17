@@ -13,6 +13,7 @@ import (
 	"time"
 
 	lp "github.com/orayew2002/db/src/proto"
+	"github.com/orayew2002/db/src/shared"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -117,10 +118,8 @@ func (w *Wal) Append(a T, table string, arg Arg) (uint64, error) {
 	}
 
 	w.lsn++
-	lsn := w.lsn
-
 	entry := &lp.WalRecord{
-		Lsn:     lsn,
+		Lsn:     w.lsn,
 		Op:      uint32(a),
 		TableId: w.catalog.GetID(table),
 		Data:    arg.Raw(),
@@ -139,7 +138,7 @@ func (w *Wal) Append(a T, table string, arg Arg) (uint64, error) {
 		return 0, err
 	}
 
-	return lsn, nil
+	return w.lsn, nil
 }
 
 func (w *Wal) Commit(lsn uint64) error {
@@ -218,6 +217,13 @@ func (w *Wal) buildAction(rec *lp.WalRecord) (Action, error) {
 			return Action{}, err
 		}
 		data = ct.GetVals()
+
+	case I:
+		var d lp.Insert
+		if err := proto.Unmarshal(rec.GetData(), &d); err != nil {
+			return Action{}, err
+		}
+		data = shared.Unmarshal(d.Val)
 
 		// TODO
 		// case INSERT:

@@ -64,9 +64,6 @@ func (c *CLI) get(cmd string) {
 		fmt.Println(err.Error())
 		return
 	}
-	if len(rows) == 0 {
-		return
-	}
 
 	heads, err := c.db.GetColumns(flags[3])
 	if err != nil {
