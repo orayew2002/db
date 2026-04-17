@@ -237,8 +237,18 @@ func (w *Wal) buildAction(rec *lp.WalRecord) (Action, error) {
 		a.Val = shared.Unmarshal(d.GetVal())
 		a.Col = d.GetCol()
 
-		// TODO
-		// case UPDATE:
+	case U:
+		var u lp.Update
+		if err := proto.Unmarshal(rec.Data, &u); err != nil {
+			return Action{}, err
+		}
+
+		a.Val = map[string]any{
+			"val":  shared.Unmarshal(u.GetVal()),
+			"vals": shared.UnmarshalMap(u.GetArgs()),
+		}
+
+		a.Col = u.GetCol()
 	}
 
 	return a, nil

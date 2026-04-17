@@ -73,7 +73,26 @@ type Update struct {
 }
 
 func (u Update) Raw() []byte {
-	return nil
+	v, err := shared.Marshal(u.Val)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	vs, err := shared.MarshalMap(u.Args)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	raw, err := proto.Marshal(&lp.Update{
+		Col:  u.Col,
+		Val:  v,
+		Args: vs,
+	})
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return raw
 }
 
 func (u Update) Vals() []string {
