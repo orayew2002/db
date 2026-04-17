@@ -13,4 +13,4 @@ pprof:
 	@go tool pprof cpu.prof
 
 proto-gen:
-	protoc --go_out=. ./src/proto/wal_domains.proto
+	protoc --go_out=. ./src/proto/*.proto

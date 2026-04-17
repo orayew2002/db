@@ -1,0 +1,11 @@
+syntax = "proto3";
+package proto;
+
+option go_package = "./src/proto;proto";
+
+message WalRecord {
+  uint64 lsn = 1;
+  uint32 op = 2;
+  uint32 table_id = 3;
+  bytes data = 4; 
+}

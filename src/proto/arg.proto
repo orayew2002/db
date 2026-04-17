@@ -1,0 +1,25 @@
+syntax = "proto3";
+package proto;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "./src/proto;proto";
+
+message CreateTable{
+  repeated string vals = 1; 
+}
+
+message Insert {
+  map<string, google.protobuf.Value> val = 1;
+}
+
+message Delete {
+  string col = 1;
+  google.protobuf.Value val = 2;
+}
+
+message Update {
+  string col = 1;
+  google.protobuf.Value val = 2;
+  map<string, google.protobuf.Value> args = 3;
+}
