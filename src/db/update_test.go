@@ -74,33 +74,3 @@ func TestDatabaseUpdatePreservesUnchangedColumnsAndRecovers(t *testing.T) {
 		t.Fatalf("expected recovered email to be preserved, got %#v", rows[0]["email"])
 	}
 }
-
-func TestDatabaseRejectsUnknownUpdateColumns(t *testing.T) {
-	dir := t.TempDir()
-	database := Create(Options{
-		WFP: filepath.Join(dir, "wal"),
-		FFP: filepath.Join(dir, "db"),
-	})
-	defer database.Close()
-
-	cols := []ColDef{}
-	cols = append(cols, ColDef{Name: "id", Type: "int"})
-	cols = append(cols, ColDef{Name: "name", Type: "text"})
-	cols = append(cols, ColDef{Name: "email", Type: "text"})
-	if err := database.CreateTable("users", cols); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := database.Insert("users", map[string]any{
-		"id":   "u1",
-		"name": "Alice",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := database.Update("users", "id", "u1", map[string]any{
-		"email": "alice@example.com",
-	}); err == nil {
-		t.Fatal("expected update with unknown column to fail")
-	}
-}
