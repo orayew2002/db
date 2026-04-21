@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -27,14 +26,16 @@ func BenchmarkInsert(b *testing.B) {
 	cols = append(cols, ColDef{Name: "email", Type: "text"})
 
 	db.CreateTable("users", cols)
+
+	row := map[string]any{
+		"id":    "bench-id",
+		"name":  "user name",
+		"email": "user email",
+	}
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		db.Insert("users", map[string]any{
-			"id":    fmt.Sprintf("%d", i),
-			"name":  "user name",
-			"email": "user email",
-		})
+		db.Insert("users", row)
 	}
 
 	db.Close()
