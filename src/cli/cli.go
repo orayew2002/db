@@ -206,7 +206,8 @@ func (c *CLI) createTable(cmd string) {
 
 	table := matches[1]
 	rows := splitCSV(matches[2])
-	tRows := make([]db.ColDef, len(rows))
+	tRows := make([]db.ColDef, 0, len(rows))
+
 	for _, r := range rows {
 		rr := strings.Split(r, " ")
 		tRows = append(tRows, db.ColDef{
