@@ -19,10 +19,12 @@ type CLI struct {
 
 var (
 	createTablePattern = regexp.MustCompile(`(?i)^CREATE\s+TABLE\s+([a-zA-Z_][\w]*)\s*\((.+)\)\s*$`)
-	insertPattern      = regexp.MustCompile(`(?i)^INSERT\s+INTO\s+([a-zA-Z_][\w]*)\s*\((.+)\)\s*$`)
-	updatePattern      = regexp.MustCompile(`(?i)^UPDATE\s+([a-zA-Z_][\w]*)\s+SET\s+(.+?)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
-	deletePattern      = regexp.MustCompile(`(?i)^DELETE\s+FROM\s+([a-zA-Z_][\w]*)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
-	selectPattern      = regexp.MustCompile(`(?i)^SELECT\s+\*\s+FROM\s+([a-zA-Z_][\w]*)\s*$`)
+	insertPattern      = regexp.MustCompile(
+		`(?i)^INSERT\s+INTO\s+([a-zA-Z_]\w*)\s*\(([^)]+)\)\s+VALUES\s*\((\s*(?:'[^']*'|[^',\s]+)(\s*,\s*(?:'[^']*'|[^',\s]+))*)\)\s*;?\s*$`)
+
+	updatePattern = regexp.MustCompile(`(?i)^UPDATE\s+([a-zA-Z_][\w]*)\s+SET\s+(.+?)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
+	deletePattern = regexp.MustCompile(`(?i)^DELETE\s+FROM\s+([a-zA-Z_][\w]*)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
+	selectPattern = regexp.MustCompile(`(?i)^SELECT\s+\*\s+FROM\s+([a-zA-Z_][\w]*)\s*$`)
 )
 
 func NewCli(db DB) *CLI {
@@ -118,10 +120,24 @@ func (c *CLI) get(cmd string) {
 		return
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header(heads)
+
+	hds := make([]string, 0, len(heads))
+	for _, h := range heads {
+		hds = append(hds, h.Name)
+	}
+	table.Header(hds)
 
 	for _, row := range rows {
-		table.Append(rowToStrings(row, nil))
+		if len(row) == 0 {
+			continue
+		}
+
+		rr := make([]any, 0, len(row))
+		for _, r := range row {
+			rr = append(rr, r)
+		}
+
+		table.Append(rr)
 	}
 
 	table.Render()
@@ -141,18 +157,34 @@ func (c *CLI) delete(cmd string) {
 
 func (c *CLI) insert(cmd string) {
 	matches := insertPattern.FindStringSubmatch(cmd)
-	if len(matches) != 3 {
+	if len(matches) != 5 {
 		fmt.Println("invalid insert syntax")
 		return
 	}
 
-	vals, err := parseAssignments(matches[2])
+	table := matches[1]
+	columns := strings.Split(matches[2], ",")
+	values := strings.Split(matches[3], ",")
+
+	var sb strings.Builder
+
+	for i := range columns {
+		sb.WriteString(columns[i])
+		sb.WriteString("=")
+		sb.WriteString(values[i])
+
+		if i != len(columns)-1 {
+			sb.WriteString(",")
+		}
+	}
+
+	parsedValues, err := parseAssignments(sb.String())
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
-	if err := c.db.Insert(matches[1], vals); err != nil {
+	if err := c.db.Insert(table, parsedValues); err != nil {
 		fmt.Println(err.Error())
 	}
 }

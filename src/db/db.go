@@ -122,9 +122,11 @@ func (d *Database) Insert(t string, v map[string]any) error {
 	if err != nil {
 		return errors.New("error append to wall file action")
 	}
-	d.applyInsert(t, v)
-	_ = d.w.Commit(lsn)
 
+	d.applyInsert(t, v)
+	if d.uwc {
+		_ = d.w.Commit(lsn)
+	}
 	return nil
 }
 
@@ -139,7 +141,9 @@ func (d *Database) Update(name string, col string, val any, v map[string]any) er
 	}
 
 	d.applyUpdate(name, col, val, v)
-	d.w.Commit(lsn)
+	if d.uwc {
+		d.w.Commit(lsn)
+	}
 
 	return nil
 }
@@ -158,7 +162,6 @@ func (d *Database) GetColumns(name string) ([]ColDef, error) {
 	}
 
 	return d.tables[name].Columns, nil
-	// return append([]string(nil), d.tables[name].Columns...), nil
 }
 
 func (d *Database) checkTable(name string) error {
@@ -239,27 +242,11 @@ func (d *Database) applyDelete(table string, col string, val any) {
 }
 
 func (d *Database) applyInsert(table string, v map[string]any) {
-	d.tables[table].Insert(mapToRow(v, nil))
+	d.tables[table].Insert(v)
 }
 
 func (d *Database) applyUpdate(table string, col string, val any, v map[string]any) {
 	d.tables[table].Update(col, val, v)
-}
-
-func mapToRow(v map[string]any, cols []string) Row {
-	row := make(Row, len(cols))
-
-	for _, key := range cols {
-		var val any
-
-		if v, ext := v[key]; ext {
-			val = v
-		}
-
-		row[key] = val
-	}
-
-	return row
 }
 
 func (d *Database) table(name string) (*Table, error) {
