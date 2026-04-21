@@ -21,7 +21,12 @@ func BenchmarkInsert(b *testing.B) {
 		FFP: "../../database/db",
 	})
 
-	db.CreateTable("users", []string{"id", "name", "email"})
+	cols := []ColDef{}
+	cols = append(cols, ColDef{Name: "id", Type: "int"})
+	cols = append(cols, ColDef{Name: "name", Type: "text"})
+	cols = append(cols, ColDef{Name: "email", Type: "text"})
+
+	db.CreateTable("users", cols)
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

@@ -15,7 +15,12 @@ func TestDatabaseUpdatePreservesUnchangedColumnsAndRecovers(t *testing.T) {
 		FFP: snapshotPath,
 	})
 
-	if err := database.CreateTable("users", []string{"id", "name", "email"}); err != nil {
+	cols := []ColDef{}
+	cols = append(cols, ColDef{Name: "id", Type: "int"})
+	cols = append(cols, ColDef{Name: "name", Type: "text"})
+	cols = append(cols, ColDef{Name: "email", Type: "text"})
+
+	if err := database.CreateTable("users", cols); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,7 +83,11 @@ func TestDatabaseRejectsUnknownUpdateColumns(t *testing.T) {
 	})
 	defer database.Close()
 
-	if err := database.CreateTable("users", []string{"id", "name"}); err != nil {
+	cols := []ColDef{}
+	cols = append(cols, ColDef{Name: "id", Type: "int"})
+	cols = append(cols, ColDef{Name: "name", Type: "text"})
+	cols = append(cols, ColDef{Name: "email", Type: "text"})
+	if err := database.CreateTable("users", cols); err != nil {
 		t.Fatal(err)
 	}
 

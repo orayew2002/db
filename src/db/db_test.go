@@ -16,15 +16,20 @@ func TestDatbase(t *testing.T) {
 	defer db.Close()
 
 	t.Run("run database", func(t *testing.T) {
-		if err := db.CreateTable("users", []string{"id", "name", "email"}); err != nil {
+		cols := []ColDef{}
+		cols = append(cols, ColDef{Name: "id", Type: "int"})
+		cols = append(cols, ColDef{Name: "name", Type: "text"})
+		cols = append(cols, ColDef{Name: "email", Type: "text"})
+
+		if err := db.CreateTable("users", cols); err != nil {
 			t.Error(err.Error())
 		}
 
-		if err := db.CreateTable("products", []string{"id", "name", "email"}); err != nil {
+		if err := db.CreateTable("products", cols); err != nil {
 			t.Error(err.Error())
 		}
 
-		if err := db.CreateTable("markets", []string{"id", "name", "email"}); err != nil {
+		if err := db.CreateTable("markets", cols); err != nil {
 			t.Error(err.Error())
 		}
 	})
@@ -39,7 +44,7 @@ func TestDatabaseRecoveryDoesNotDuplicateOrReappendWAL(t *testing.T) {
 		WFP: walPath,
 		FFP: snapshotPath,
 	})
-	if err := db.CreateTable("users", []string{"id", "name", "email"}); err != nil {
+	if err := db.CreateTable("users", nil); err != nil {
 		t.Fatal(err)
 	}
 

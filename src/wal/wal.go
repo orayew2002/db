@@ -221,7 +221,7 @@ func (w *Wal) buildAction(rec *lp.WalRecord) (Action, error) {
 		if err := proto.Unmarshal(rec.GetData(), &ct); err != nil {
 			return Action{}, err
 		}
-		a.Val = ct.GetVals()
+		a.Val = ct.GetCols()
 
 	case I:
 		var d lp.Insert

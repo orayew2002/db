@@ -7,13 +7,21 @@ import (
 )
 
 type CreateTable struct {
-	Vls []string
+	Cols []ColDef
+}
+
+type ColDef struct {
+	Name string
+	Type string
 }
 
 func (c CreateTable) Raw() []byte {
-	s := lp.CreateTable{Vals: c.Vals()}
+	tc := make([]*lp.TableCol, len(c.Cols))
+	for i, c := range c.Cols {
+		tc[i] = &lp.TableCol{Name: c.Name, Type: c.Type}
+	}
 
-	b, err := proto.Marshal(&s)
+	b, err := proto.Marshal(&lp.CreateTable{Cols: tc})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -22,7 +30,12 @@ func (c CreateTable) Raw() []byte {
 }
 
 func (c CreateTable) Vals() []string {
-	return c.Vls
+	v := make([]string, len(c.Cols))
+	for i, val := range c.Cols {
+		v[i] = val.Name
+	}
+
+	return v
 }
 
 type Delete struct {

@@ -7,6 +7,7 @@ type Action string
 const (
 	ShowTables      Action = "show tables"
 	CreateTable     Action = "create table"
+	DescribreTable  Action = "describe table"
 	Insert          Action = "insert"
 	Update          Action = "update"
 	Delete          Action = "delete"
@@ -39,6 +40,10 @@ func parseCMD(cmd string) Action {
 
 	if strings.HasPrefix(cmd, "SELECT") {
 		return Get
+	}
+
+	if strings.HasPrefix(cmd, "DESCRIBE") {
+		return DescribreTable
 	}
 
 	return CommandNotFound

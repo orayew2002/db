@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/orayew2002/db/src/db"
 )
 
 type CLI struct {
@@ -64,10 +65,38 @@ func (c *CLI) Run() {
 		case Get:
 			c.get(line)
 
+		case DescribreTable:
+			c.describeTable(line)
+
 		case CommandNotFound:
 			fmt.Print("command not found \n")
 		}
 	}
+}
+
+func (c *CLI) describeTable(cmd string) {
+	command := strings.Split(cmd, " ")
+	if len(command) != 2 {
+		fmt.Println("invalid select syntax")
+		return
+	}
+
+	table := command[1]
+
+	cols, err := c.db.GetColumns(table)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	tb := tablewriter.NewWriter(os.Stdout)
+	tb.Header("Column", "Type")
+
+	for _, c := range cols {
+		tb.Append(c.Name, c.Type)
+	}
+
+	tb.Render()
 }
 
 func (c *CLI) get(cmd string) {
@@ -92,7 +121,7 @@ func (c *CLI) get(cmd string) {
 	table.Header(heads)
 
 	for _, row := range rows {
-		table.Append(rowToStrings(row, heads))
+		table.Append(rowToStrings(row, nil))
 	}
 
 	table.Render()
@@ -165,6 +194,9 @@ func (c *CLI) showTables() {
 	table.Render()
 }
 
+const RowName int = 0
+const RowType int = 1
+
 func (c *CLI) createTable(cmd string) {
 	matches := createTablePattern.FindStringSubmatch(cmd)
 	if len(matches) != 3 {
@@ -174,8 +206,16 @@ func (c *CLI) createTable(cmd string) {
 
 	table := matches[1]
 	rows := splitCSV(matches[2])
+	tRows := make([]db.ColDef, len(rows))
+	for _, r := range rows {
+		rr := strings.Split(r, " ")
+		tRows = append(tRows, db.ColDef{
+			Type: rr[RowType],
+			Name: rr[RowName],
+		})
+	}
 
-	if err := c.db.CreateTable(table, rows); err != nil {
+	if err := c.db.CreateTable(table, tRows); err != nil {
 		fmt.Println(err.Error())
 		return
 	}

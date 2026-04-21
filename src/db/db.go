@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/orayew2002/db/src/fm"
+	"github.com/orayew2002/db/src/proto"
 	"github.com/orayew2002/db/src/wal"
 )
 
@@ -77,7 +78,7 @@ func (d *Database) Setfm(fm FM) error {
 	return d.fm.Load(&d.tables)
 }
 
-func (d *Database) CreateTable(name string, columns []string) error {
+func (d *Database) CreateTable(name string, columns []ColDef) error {
 	if _, ext := d.tables[name]; ext {
 		return nil
 	}
@@ -97,11 +98,7 @@ func (d *Database) CreateTable(name string, columns []string) error {
 }
 
 func (d *Database) Delete(t string, col string, val any) error {
-	table, err := d.table(t)
-	if err != nil {
-		return err
-	}
-	if err := requireKnownColumns(table, col); err != nil {
+	if _, err := d.table(t); err != nil {
 		return err
 	}
 
@@ -117,12 +114,7 @@ func (d *Database) Delete(t string, col string, val any) error {
 }
 
 func (d *Database) Insert(t string, v map[string]any) error {
-	table, err := d.table(t)
-	if err != nil {
-		return err
-	}
-
-	if err := requireInsertColumns(table, v); err != nil {
+	if _, err := d.table(t); err != nil {
 		return err
 	}
 
@@ -137,15 +129,7 @@ func (d *Database) Insert(t string, v map[string]any) error {
 }
 
 func (d *Database) Update(name string, col string, val any, v map[string]any) error {
-	table, err := d.table(name)
-	if err != nil {
-		return err
-	}
-
-	if err := requireKnownColumns(table, col); err != nil {
-		return err
-	}
-	if err := requireUpdateColumns(table, v); err != nil {
+	if _, err := d.table(name); err != nil {
 		return err
 	}
 
@@ -168,12 +152,13 @@ func (d *Database) Get(name string) ([]map[string]any, error) {
 	return d.tables[name].Rows, nil
 }
 
-func (d *Database) GetColumns(name string) ([]string, error) {
+func (d *Database) GetColumns(name string) ([]ColDef, error) {
 	if err := d.checkTable(name); err != nil {
 		return nil, err
 	}
 
-	return append([]string(nil), d.tables[name].Columns...), nil
+	return d.tables[name].Columns, nil
+	// return append([]string(nil), d.tables[name].Columns...), nil
 }
 
 func (d *Database) checkTable(name string) error {
@@ -200,7 +185,13 @@ func (d *Database) Close() {
 func (d *Database) apply(a wal.Action) error {
 	switch a.T {
 	case wal.CT:
-		d.applyCreateTable(a.Table, toStringSlice(a.Val))
+		protoTableCols := a.Val.([]*proto.TableCol)
+		cols := make([]ColDef, len(protoTableCols))
+		for i, c := range protoTableCols {
+			cols[i] = ColDef{Name: c.Name, Type: c.Type}
+		}
+
+		d.applyCreateTable(a.Table, cols)
 		return nil
 
 	case wal.I:
@@ -208,24 +199,9 @@ func (d *Database) apply(a wal.Action) error {
 		if !ok {
 			return errors.New("invalid insert payload")
 		}
-		table, err := d.table(a.Table)
-		if err != nil {
-			return err
-		}
-		if err := requireInsertColumns(table, v); err != nil {
-			return err
-		}
-
 		d.applyInsert(a.Table, v)
 		return nil
 	case wal.D:
-		table, err := d.table(a.Table)
-		if err != nil {
-			return err
-		}
-		if err := requireKnownColumns(table, a.Col); err != nil {
-			return err
-		}
 
 		d.applyDelete(a.Table, a.Col, a.Val)
 		return nil
@@ -240,16 +216,6 @@ func (d *Database) apply(a wal.Action) error {
 			return errors.New("invalid update values")
 		}
 
-		table, err := d.table(a.Table)
-		if err != nil {
-			return err
-		}
-		if err := requireKnownColumns(table, a.Col); err != nil {
-			return err
-		}
-		if err := requireUpdateColumns(table, v); err != nil {
-			return err
-		}
 		d.applyUpdate(a.Table, a.Col, m["val"], v)
 		return nil
 	default:
@@ -257,14 +223,14 @@ func (d *Database) apply(a wal.Action) error {
 	}
 }
 
-func (d *Database) applyCreateTable(name string, columns []string) {
+func (d *Database) applyCreateTable(name string, columns []ColDef) {
 	if _, ext := d.tables[name]; ext {
 		return
 	}
 
 	d.tables[name] = &Table{
 		Name:    name,
-		Columns: append([]string(nil), columns...),
+		Columns: append(make([]ColDef, 0), columns...),
 	}
 }
 
@@ -273,7 +239,7 @@ func (d *Database) applyDelete(table string, col string, val any) {
 }
 
 func (d *Database) applyInsert(table string, v map[string]any) {
-	d.tables[table].Insert(mapToRow(v, d.tables[table].Columns))
+	d.tables[table].Insert(mapToRow(v, nil))
 }
 
 func (d *Database) applyUpdate(table string, col string, val any, v map[string]any) {
@@ -296,34 +262,6 @@ func mapToRow(v map[string]any, cols []string) Row {
 	return row
 }
 
-func toStringSlice(v any) []string {
-	switch val := v.(type) {
-
-	case []string:
-		return val
-
-	case []any:
-		res := make([]string, 0, len(val))
-		for _, item := range val {
-			switch s := item.(type) {
-			case string:
-				res = append(res, s)
-			case []byte:
-				res = append(res, string(s))
-			default:
-				res = append(res, fmt.Sprintf("%v", s))
-			}
-		}
-		return res
-
-	case nil:
-		return nil
-
-	default:
-		return []string{fmt.Sprintf("%v", val)}
-	}
-}
-
 func (d *Database) table(name string) (*Table, error) {
 	table, ok := d.tables[name]
 	if !ok {
@@ -331,54 +269,4 @@ func (d *Database) table(name string) (*Table, error) {
 	}
 
 	return table, nil
-}
-
-func requireInsertColumns(table *Table, values map[string]any) error {
-	if len(values) != len(table.Columns) {
-		return errors.New("error vals count mismatching")
-	}
-
-	if err := requireKnownColumns(table, mapKeys(values)...); err != nil {
-		return err
-	}
-
-	for _, column := range table.Columns {
-		if _, ok := values[column]; !ok {
-			return fmt.Errorf("missing column %q", column)
-		}
-	}
-
-	return nil
-}
-
-func requireUpdateColumns(table *Table, values map[string]any) error {
-	if len(values) == 0 {
-		return errors.New("update requires at least one column")
-	}
-
-	return requireKnownColumns(table, mapKeys(values)...)
-}
-
-func requireKnownColumns(table *Table, columns ...string) error {
-	known := make(map[string]struct{}, len(table.Columns))
-	for _, column := range table.Columns {
-		known[column] = struct{}{}
-	}
-
-	for _, column := range columns {
-		if _, ok := known[column]; !ok {
-			return fmt.Errorf("unknown column %q", column)
-		}
-	}
-
-	return nil
-}
-
-func mapKeys(values map[string]any) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-
-	return keys
 }
