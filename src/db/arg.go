@@ -6,23 +6,35 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type CreateTable struct {
-	Vls []string
+type Arg interface {
+	AppendRaw([]byte) []byte
+	Vals() []string
 }
 
-func (c CreateTable) Raw() []byte {
-	s := lp.CreateTable{Vals: c.Vals()}
+type CreateTable struct {
+	Cols []ColDef
+}
 
-	b, err := proto.Marshal(&s)
-	if err != nil {
-		panic(err.Error())
+type ColDef struct {
+	Name string
+	Type string
+}
+
+func (c CreateTable) AppendRaw(dst []byte) []byte {
+	tc := make([]*lp.TableCol, len(c.Cols))
+	for i, col := range c.Cols {
+		tc[i] = &lp.TableCol{Name: col.Name, Type: col.Type}
 	}
-
-	return b
+	b, _ := proto.Marshal(&lp.CreateTable{Cols: tc})
+	return append(dst, b...)
 }
 
 func (c CreateTable) Vals() []string {
-	return c.Vls
+	v := make([]string, len(c.Cols))
+	for i, val := range c.Cols {
+		v[i] = val.Name
+	}
+	return v
 }
 
 type Delete struct {
@@ -30,14 +42,10 @@ type Delete struct {
 	Val any
 }
 
-func (d Delete) Raw() []byte {
+func (d Delete) AppendRaw(dst []byte) []byte {
 	v, _ := shared.Marshal(d.Val)
-	raw, err := proto.Marshal(&lp.Delete{Col: d.Col, Val: v})
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return raw
+	b, _ := proto.Marshal(&lp.Delete{Col: d.Col, Val: v})
+	return append(dst, b...)
 }
 
 func (d Delete) Vals() []string {
@@ -48,18 +56,8 @@ type Insert struct {
 	Val map[string]any
 }
 
-func (i Insert) Raw() []byte {
-	converted, err := shared.MarshalMap(i.Val)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	raw, err := proto.Marshal(&lp.Insert{Val: converted})
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return raw
+func (i Insert) AppendRaw(dst []byte) []byte {
+	return appendMapJSON(dst, i.Val)
 }
 
 func (i Insert) Vals() []string {
@@ -72,27 +70,11 @@ type Update struct {
 	Args map[string]any
 }
 
-func (u Update) Raw() []byte {
-	v, err := shared.Marshal(u.Val)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	vs, err := shared.MarshalMap(u.Args)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	raw, err := proto.Marshal(&lp.Update{
-		Col:  u.Col,
-		Val:  v,
-		Args: vs,
-	})
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return raw
+func (u Update) AppendRaw(dst []byte) []byte {
+	v, _ := shared.Marshal(u.Val)
+	vs, _ := shared.MarshalMap(u.Args)
+	b, _ := proto.Marshal(&lp.Update{Col: u.Col, Val: v, Args: vs})
+	return append(dst, b...)
 }
 
 func (u Update) Vals() []string {

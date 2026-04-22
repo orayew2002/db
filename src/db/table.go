@@ -7,7 +7,7 @@ import (
 
 type Table struct {
 	Name    string           `json:"name"`
-	Columns []string         `json:"columns"`
+	Columns []ColDef         `json:"columns"`
 	Rows    []map[string]any `json:"rows"`
 }
 

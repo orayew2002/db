@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/orayew2002/db/src/db"
 )
 
 type CLI struct {
@@ -18,10 +19,12 @@ type CLI struct {
 
 var (
 	createTablePattern = regexp.MustCompile(`(?i)^CREATE\s+TABLE\s+([a-zA-Z_][\w]*)\s*\((.+)\)\s*$`)
-	insertPattern      = regexp.MustCompile(`(?i)^INSERT\s+INTO\s+([a-zA-Z_][\w]*)\s*\((.+)\)\s*$`)
-	updatePattern      = regexp.MustCompile(`(?i)^UPDATE\s+([a-zA-Z_][\w]*)\s+SET\s+(.+?)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
-	deletePattern      = regexp.MustCompile(`(?i)^DELETE\s+FROM\s+([a-zA-Z_][\w]*)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
-	selectPattern      = regexp.MustCompile(`(?i)^SELECT\s+\*\s+FROM\s+([a-zA-Z_][\w]*)\s*$`)
+	insertPattern      = regexp.MustCompile(
+		`(?i)^INSERT\s+INTO\s+([a-zA-Z_]\w*)\s*\(([^)]+)\)\s+VALUES\s*\((\s*(?:'[^']*'|[^',\s]+)(\s*,\s*(?:'[^']*'|[^',\s]+))*)\)\s*;?\s*$`)
+
+	updatePattern = regexp.MustCompile(`(?i)^UPDATE\s+([a-zA-Z_][\w]*)\s+SET\s+(.+?)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
+	deletePattern = regexp.MustCompile(`(?i)^DELETE\s+FROM\s+([a-zA-Z_][\w]*)\s+WHERE\s+([a-zA-Z_][\w]*)\s*=\s*(.+)\s*$`)
+	selectPattern = regexp.MustCompile(`(?i)^SELECT\s+\*\s+FROM\s+([a-zA-Z_][\w]*)\s*$`)
 )
 
 func NewCli(db DB) *CLI {
@@ -64,10 +67,38 @@ func (c *CLI) Run() {
 		case Get:
 			c.get(line)
 
+		case DescribreTable:
+			c.describeTable(line)
+
 		case CommandNotFound:
 			fmt.Print("command not found \n")
 		}
 	}
+}
+
+func (c *CLI) describeTable(cmd string) {
+	command := strings.Split(cmd, " ")
+	if len(command) != 2 {
+		fmt.Println("invalid select syntax")
+		return
+	}
+
+	table := command[1]
+
+	cols, err := c.db.GetColumns(table)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	tb := tablewriter.NewWriter(os.Stdout)
+	tb.Header("Column", "Type")
+
+	for _, c := range cols {
+		tb.Append(c.Name, c.Type)
+	}
+
+	tb.Render()
 }
 
 func (c *CLI) get(cmd string) {
@@ -89,10 +120,24 @@ func (c *CLI) get(cmd string) {
 		return
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	table.Header(heads)
+
+	hds := make([]string, 0, len(heads))
+	for _, h := range heads {
+		hds = append(hds, h.Name)
+	}
+	table.Header(hds)
 
 	for _, row := range rows {
-		table.Append(rowToStrings(row, heads))
+		if len(row) == 0 {
+			continue
+		}
+
+		rr := make([]any, 0, len(row))
+		for _, r := range row {
+			rr = append(rr, r)
+		}
+
+		table.Append(rr)
 	}
 
 	table.Render()
@@ -112,18 +157,34 @@ func (c *CLI) delete(cmd string) {
 
 func (c *CLI) insert(cmd string) {
 	matches := insertPattern.FindStringSubmatch(cmd)
-	if len(matches) != 3 {
+	if len(matches) != 5 {
 		fmt.Println("invalid insert syntax")
 		return
 	}
 
-	vals, err := parseAssignments(matches[2])
+	table := matches[1]
+	columns := strings.Split(matches[2], ",")
+	values := strings.Split(matches[3], ",")
+
+	var sb strings.Builder
+
+	for i := range columns {
+		sb.WriteString(columns[i])
+		sb.WriteString("=")
+		sb.WriteString(values[i])
+
+		if i != len(columns)-1 {
+			sb.WriteString(",")
+		}
+	}
+
+	parsedValues, err := parseAssignments(sb.String())
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
-	if err := c.db.Insert(matches[1], vals); err != nil {
+	if err := c.db.Insert(table, parsedValues); err != nil {
 		fmt.Println(err.Error())
 	}
 }
@@ -165,6 +226,9 @@ func (c *CLI) showTables() {
 	table.Render()
 }
 
+const RowName int = 0
+const RowType int = 1
+
 func (c *CLI) createTable(cmd string) {
 	matches := createTablePattern.FindStringSubmatch(cmd)
 	if len(matches) != 3 {
@@ -174,8 +238,17 @@ func (c *CLI) createTable(cmd string) {
 
 	table := matches[1]
 	rows := splitCSV(matches[2])
+	tRows := make([]db.ColDef, 0, len(rows))
 
-	if err := c.db.CreateTable(table, rows); err != nil {
+	for _, r := range rows {
+		rr := strings.Split(r, " ")
+		tRows = append(tRows, db.ColDef{
+			Type: rr[RowType],
+			Name: rr[RowName],
+		})
+	}
+
+	if err := c.db.CreateTable(table, tRows); err != nil {
 		fmt.Println(err.Error())
 		return
 	}

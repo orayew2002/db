@@ -3,6 +3,7 @@ package wal
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -38,6 +39,9 @@ type Wal struct {
 	closed     bool          // indicates whether WAL is closed and no further writes are allowed
 	done       chan struct{} // signals shutdown/termination of WAL background workers (if any)
 	catalog    *Catalog      // schema registry used to resolve table/column names into numeric IDs
+	dataBuf    []byte        // reusable buffer for arg payload (protected by mu)
+	recBuf     []byte        // reusable buffer for marshaled WalRecord (protected by mu)
+	entry      lp.WalRecord  // reusable record struct (protected by mu)
 }
 
 type Action struct {
@@ -67,6 +71,8 @@ func NewWal(path string) *Wal {
 		buf:     bufio.NewWriterSize(f, 1<<20),
 		catalog: ctl,
 		done:    make(chan struct{}),
+		dataBuf: make([]byte, 0, 256),
+		recBuf:  make([]byte, 0, 512),
 	}
 
 	w.cond = sync.NewCond(&w.mu)
@@ -92,7 +98,7 @@ func (w *Wal) writerLoop() {
 }
 
 type Arg interface {
-	Raw() []byte
+	AppendRaw([]byte) []byte
 	Vals() []string
 }
 
@@ -117,23 +123,25 @@ func (w *Wal) Append(a T, table string, arg Arg) (uint64, error) {
 	}
 
 	w.lsn++
-	entry := &lp.WalRecord{
-		Lsn:     w.lsn,
-		Op:      uint32(a),
-		TableId: w.catalog.GetID(table),
-		Data:    arg.Raw(),
-	}
+	w.dataBuf = arg.AppendRaw(w.dataBuf[:0])
 
-	b, err := proto.Marshal(entry)
+	w.entry.Lsn = w.lsn
+	w.entry.Op = uint32(a)
+	w.entry.TableId = w.catalog.GetID(table)
+	w.entry.Data = w.dataBuf
+
+	// Reserve 4 bytes for the length prefix, then marshal the record after them.
+	// Filling both into a single heap-resident slice avoids a stack-escaping
+	// [4]byte that would otherwise be forced onto the heap by the bufio.Writer's
+	// internal io.Writer interface call.
+	w.recBuf = append(w.recBuf[:0], 0, 0, 0, 0)
+	var err error
+	w.recBuf, err = proto.MarshalOptions{}.MarshalAppend(w.recBuf, &w.entry)
 	if err != nil {
-		return 0, fmt.Errorf("error marhsal proto file: %w", err)
+		return 0, fmt.Errorf("error marshal proto file: %w", err)
 	}
-
-	if err := binary.Write(w.buf, binary.LittleEndian, uint32(len(b))); err != nil {
-		return 0, fmt.Errorf("error write marshaled data to file: %w", err)
-	}
-
-	if _, err := w.buf.Write(b); err != nil {
+	binary.LittleEndian.PutUint32(w.recBuf[:4], uint32(len(w.recBuf)-4))
+	if _, err := w.buf.Write(w.recBuf); err != nil {
 		return 0, err
 	}
 
@@ -221,14 +229,14 @@ func (w *Wal) buildAction(rec *lp.WalRecord) (Action, error) {
 		if err := proto.Unmarshal(rec.GetData(), &ct); err != nil {
 			return Action{}, err
 		}
-		a.Val = ct.GetVals()
+		a.Val = ct.GetCols()
 
 	case I:
-		var d lp.Insert
-		if err := proto.Unmarshal(rec.GetData(), &d); err != nil {
+		var m map[string]any
+		if err := json.Unmarshal(rec.GetData(), &m); err != nil {
 			return Action{}, err
 		}
-		a.Val = shared.UnmarshalMap(d.Val)
+		a.Val = m
 
 	case D:
 		var d lp.Delete
