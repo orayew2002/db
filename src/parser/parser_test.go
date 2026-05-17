@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -23,10 +22,7 @@ func runTest(t *testing.T, q []string) {
 	l := lexer.New(query)
 	p := New(l)
 
-	st, err := p.Parse()
-	if err != nil {
+	if _, err := p.Parse(); err != nil {
 		t.Error(err.Error())
 	}
-
-	fmt.Printf("%+v", st)
 }

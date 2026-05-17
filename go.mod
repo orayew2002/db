@@ -2,10 +2,7 @@ module github.com/orayew2002/db
 
 go 1.25.7
 
-require (
-	github.com/olekukonko/tablewriter v1.1.4
-	google.golang.org/protobuf v1.36.11
-)
+require google.golang.org/protobuf v1.36.11
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -18,5 +15,6 @@ require (
 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
 	github.com/olekukonko/errors v1.2.0 // indirect
 	github.com/olekukonko/ll v0.1.6 // indirect
+	github.com/olekukonko/tablewriter v1.1.4 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 )

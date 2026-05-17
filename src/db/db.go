@@ -149,7 +149,7 @@ func (d *Database) Update(name string, col string, val any, v map[string]any) er
 }
 
 func (d *Database) Get(name string) ([]map[string]any, error) {
-	if err := d.checkTable(name); err != nil {
+	if err := d.CheckTable(name); err != nil {
 		return nil, err
 	}
 
@@ -157,14 +157,14 @@ func (d *Database) Get(name string) ([]map[string]any, error) {
 }
 
 func (d *Database) GetColumns(name string) ([]ColDef, error) {
-	if err := d.checkTable(name); err != nil {
+	if err := d.CheckTable(name); err != nil {
 		return nil, err
 	}
 
 	return d.tables[name].Columns, nil
 }
 
-func (d *Database) checkTable(name string) error {
+func (d *Database) CheckTable(name string) error {
 	if _, ext := d.tables[name]; !ext {
 		return errors.New("table not exists")
 	}
