@@ -78,6 +78,85 @@ func TestParser(t *testing.T) {
 			"(", "1", ",", "'John'",
 		})
 	})
+
+	t.Run("delete without where", func(t *testing.T) {
+		runTest(t, []string{
+			"DELETE",
+			"FROM",
+			"users",
+		})
+	})
+
+	t.Run("delete with where number", func(t *testing.T) {
+		runTest(t, []string{
+			"DELETE",
+			"FROM",
+			"users",
+			"WHERE",
+			"id",
+			"=",
+			"1",
+		})
+	})
+
+	t.Run("delete with where string", func(t *testing.T) {
+		runTest(t, []string{
+			"DELETE",
+			"FROM",
+			"users",
+			"WHERE",
+			"name",
+			"=",
+			"'John'",
+		})
+	})
+
+	t.Run("delete missing from", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DELETE",
+			"users",
+		})
+	})
+
+	t.Run("delete missing table", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DELETE",
+			"FROM",
+		})
+	})
+
+	t.Run("delete invalid where", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DELETE",
+			"FROM",
+			"users",
+			"WHERE",
+			"=",
+			"1",
+		})
+	})
+
+	t.Run("delete missing operator", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DELETE",
+			"FROM",
+			"users",
+			"WHERE",
+			"id",
+			"1",
+		})
+	})
+
+	t.Run("delete missing right side", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DELETE",
+			"FROM",
+			"users",
+			"WHERE",
+			"id",
+			"=",
+		})
+	})
 }
 
 func runTest(t *testing.T, q []string) {

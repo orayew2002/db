@@ -6,6 +6,12 @@ import (
 	"github.com/orayew2002/db/src/lexer"
 )
 
+type WhereClause struct {
+	Left     string
+	Operator string
+	Right    string
+}
+
 func New(l *lexer.Lexer) *Parser {
 	return &Parser{l: l}
 }
@@ -22,6 +28,10 @@ func (p *Parser) Parse() (Statement, error) {
 
 	if tok.Type == lexer.KEYWORD && tok.Val == "INSERT" {
 		return p.parseInsert()
+	}
+
+	if tok.Type == lexer.KEYWORD && tok.Val == "DELETE" {
+		return p.parseDelete()
 	}
 
 	return nil, fmt.Errorf("unknown statement: %s", tok.Val)

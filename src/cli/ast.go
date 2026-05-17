@@ -28,7 +28,34 @@ func (c *CLI) runStmt(s parser.Statement) {
 		}
 
 		if err := c.db.Insert(stmt.Table, r); err != nil {
-			panic(fmt.Errorf("error inserting data to table: %w", err.Error()))
+			panic(fmt.Errorf("error inserting data to table: %w", err))
+		}
+	}
+
+	if stmt, ok := s.(*parser.DeleteStmt); ok {
+		c.checkTable(stmt.Table)
+
+		rows, err := c.db.Get(stmt.Table)
+		if err != nil {
+			panic(fmt.Errorf("error featching database data : %w", err))
+		}
+
+		if stmt.Where != nil {
+			for _, r := range rows {
+				if r[stmt.Where.Left] == stmt.Where.Right {
+					for k, v := range r {
+						c.db.Delete(stmt.Table, k, v)
+					}
+				}
+			}
+
+			return
+		}
+
+		for _, r := range rows {
+			for k, v := range r {
+				c.db.Delete(stmt.Table, k, v)
+			}
 		}
 	}
 }
