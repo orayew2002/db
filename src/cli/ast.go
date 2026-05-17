@@ -8,18 +8,33 @@ import (
 )
 
 func (c *CLI) runStmt(s parser.Statement) {
-	if selectStmt, ok := s.(*parser.SelectStmt); ok {
+	if stmt, ok := s.(*parser.SelectStmt); ok {
+		c.checkTable(stmt.Table)
 
-		// First check table is exists
-		if err := c.db.CheckTable(selectStmt.Table); err != nil {
-			panic(fmt.Errorf("table not exists"))
-		}
-
-		date, err := c.db.Get(selectStmt.Table)
+		date, err := c.db.Get(stmt.Table)
 		if err != nil {
 			panic(fmt.Errorf("error featching database data : %w", err))
 		}
 
-		ui.ShowTable(selectStmt.Table, date)
+		ui.ShowTable(stmt.Table, date)
+	}
+
+	if stmt, ok := s.(*parser.InsertStmt); ok {
+		c.checkTable(stmt.Table)
+
+		r := make(map[string]any, len(stmt.Values))
+		for i, c := range stmt.Columns {
+			r[c] = stmt.Values[i]
+		}
+
+		if err := c.db.Insert(stmt.Table, r); err != nil {
+			panic(fmt.Errorf("error inserting data to table: %w", err.Error()))
+		}
+	}
+}
+
+func (c *CLI) checkTable(table string) {
+	if err := c.db.CheckTable(table); err != nil {
+		panic(fmt.Errorf("table not exists"))
 	}
 }

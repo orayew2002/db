@@ -20,5 +20,9 @@ func (p *Parser) Parse() (Statement, error) {
 		return p.parseSelect()
 	}
 
+	if tok.Type == lexer.KEYWORD && tok.Val == "INSERT" {
+		return p.parseInsert()
+	}
+
 	return nil, fmt.Errorf("unknown statement: %s", tok.Val)
 }
