@@ -58,6 +58,16 @@ func (c *CLI) runStmt(s parser.Statement) {
 			}
 		}
 	}
+
+	if stmt, ok := s.(*parser.CreateTableStmt); ok {
+		if err := c.db.CheckTable(stmt.Table); err == nil {
+			panic("this table already exists")
+		}
+
+		if err := c.db.CreateTable(stmt.Table, stmt.Columns); err != nil {
+			panic(fmt.Errorf("error creating table: %w", err))
+		}
+	}
 }
 
 func (c *CLI) checkTable(table string) {

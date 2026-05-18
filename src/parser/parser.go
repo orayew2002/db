@@ -34,5 +34,9 @@ func (p *Parser) Parse() (Statement, error) {
 		return p.parseDelete()
 	}
 
+	if tok.Type == lexer.KEYWORD && tok.Val == "CREATE" {
+		return p.parseCreateTable()
+	}
+
 	return nil, fmt.Errorf("unknown statement: %s", tok.Val)
 }

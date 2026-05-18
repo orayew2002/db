@@ -157,6 +157,62 @@ func TestParser(t *testing.T) {
 			"=",
 		})
 	})
+
+	t.Run("create table basic", func(t *testing.T) {
+		runTest(t, []string{
+			"CREATE", "TABLE", "users",
+			"(", "id", "INT", ",", "name", "TEXT", ")",
+		})
+	})
+
+	t.Run("create table single column", func(t *testing.T) {
+		runTest(t, []string{
+			"CREATE", "TABLE", "users",
+			"(", "id", "INT", ")",
+		})
+	})
+
+	t.Run("create table multiple columns", func(t *testing.T) {
+		runTest(t, []string{
+			"CREATE", "TABLE", "users",
+			"(", "id", "INT", ",", "name", "TEXT", ",", "email", "TEXT", ")",
+		})
+	})
+
+	t.Run("create table missing table name", func(t *testing.T) {
+		runTestFail(t, []string{
+			"CREATE", "TABLE",
+			"(", "id", "INT", ")",
+		})
+	})
+
+	t.Run("create table missing opening paren", func(t *testing.T) {
+		runTestFail(t, []string{
+			"CREATE", "TABLE", "users",
+			"id", "INT", ")",
+		})
+	})
+
+	t.Run("create table missing column type", func(t *testing.T) {
+		runTestFail(t, []string{
+			"CREATE", "TABLE", "users",
+			"(", "id", ",", "name", "TEXT", ")",
+		})
+	})
+
+	t.Run("create table invalid column name", func(t *testing.T) {
+		runTestFail(t, []string{
+			"CREATE", "TABLE", "users",
+			"(", ",", "INT", ")",
+		})
+	})
+
+	t.Run("create table missing closing paren", func(t *testing.T) {
+		runTestFail(t, []string{
+			"CREATE", "TABLE", "users",
+			"(", "id", "INT",
+		})
+	})
 }
 
 func runTest(t *testing.T, q []string) {
