@@ -41,22 +41,31 @@ func (c *CLI) runStmt(s parser.Statement) {
 		}
 
 		if stmt.Where != nil {
+			var i int
 			for _, r := range rows {
 				if r[stmt.Where.Left] == stmt.Where.Right {
 					for k, v := range r {
 						c.db.Delete(stmt.Table, k, v)
+						i++
+						break
 					}
 				}
 			}
 
+			fmt.Printf("delete data: %d \n", i)
 			return
 		}
 
+		var i int
 		for _, r := range rows {
 			for k, v := range r {
 				c.db.Delete(stmt.Table, k, v)
+				i++
+				break
 			}
 		}
+
+		fmt.Printf("delete data: %d \n", i)
 	}
 
 	if stmt, ok := s.(*parser.CreateTableStmt); ok {
@@ -67,6 +76,38 @@ func (c *CLI) runStmt(s parser.Statement) {
 		if err := c.db.CreateTable(stmt.Table, stmt.Columns); err != nil {
 			panic(fmt.Errorf("error creating table: %w", err))
 		}
+	}
+
+	if stmt, ok := s.(*parser.UpdateStmt); ok {
+		c.checkTable(stmt.Table)
+
+		rows, err := c.db.Get(stmt.Table)
+		if err != nil {
+			panic(fmt.Errorf("error getting data: %w", err))
+		}
+
+		if stmt.Where != nil {
+			nv := make([]map[string]any, 0)
+
+			for _, r := range rows {
+				if r[stmt.Where.Left].(string) == stmt.Where.Right {
+					for v, k := range stmt.Set {
+						r[v] = k
+					}
+
+					nv = append(nv, r)
+				}
+			}
+
+			for _, n := range nv {
+				c.db.Update(stmt.Table, stmt.Where.Left, stmt.Where.Right, n)
+			}
+
+			return
+		}
+
+		// TODO
+		// need write logic for update all elements if where clauser not detected
 	}
 }
 

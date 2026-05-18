@@ -55,7 +55,7 @@ type Action struct {
 func NewWal(path string) *Wal {
 	_ = os.MkdirAll(filepath.Dir(path), os.ModePerm)
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o644)
 	if err != nil {
 		panic(err)
 	}

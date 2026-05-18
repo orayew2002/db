@@ -213,6 +213,84 @@ func TestParser(t *testing.T) {
 			"(", "id", "INT",
 		})
 	})
+
+	t.Run("update basic without where", func(t *testing.T) {
+		runTest(t, []string{
+			"UPDATE", "users",
+			"SET", "name", "=", "'John'",
+		})
+	})
+
+	t.Run("update with where number", func(t *testing.T) {
+		runTest(t, []string{
+			"UPDATE", "users",
+			"SET", "name", "=", "'John'",
+			"WHERE", "id", "=", "1",
+		})
+	})
+
+	t.Run("update with where string", func(t *testing.T) {
+		runTest(t, []string{
+			"UPDATE", "users",
+			"SET", "name", "=", "'John'",
+			"WHERE", "name", "=", "'Alice'",
+		})
+	})
+
+	t.Run("update multiple set columns", func(t *testing.T) {
+		runTest(t, []string{
+			"UPDATE", "users",
+			"SET",
+			"name", "=", "'John'", ",",
+			"email", "=", "'john@mail.com'",
+		})
+	})
+
+	t.Run("update multiple set with where", func(t *testing.T) {
+		runTest(t, []string{
+			"UPDATE", "users",
+			"SET",
+			"name", "=", "'John'", ",",
+			"email", "=", "'john@mail.com'",
+			"WHERE", "id", "=", "1",
+		})
+	})
+
+	t.Run("update missing table", func(t *testing.T) {
+		runTestFail(t, []string{
+			"UPDATE",
+			"SET", "name", "=", "'John'",
+		})
+	})
+
+	t.Run("update missing set", func(t *testing.T) {
+		runTestFail(t, []string{
+			"UPDATE", "users",
+			"name", "=", "'John'",
+		})
+	})
+
+	t.Run("update invalid set syntax", func(t *testing.T) {
+		runTestFail(t, []string{
+			"UPDATE", "users",
+			"SET", "name", "'John'",
+		})
+	})
+
+	t.Run("update invalid where", func(t *testing.T) {
+		runTestFail(t, []string{
+			"UPDATE", "users",
+			"SET", "name", "=", "'John'",
+			"WHERE", "=", "1",
+		})
+	})
+
+	t.Run("update missing value", func(t *testing.T) {
+		runTestFail(t, []string{
+			"UPDATE", "users",
+			"SET", "name", "=",
+		})
+	})
 }
 
 func runTest(t *testing.T, q []string) {
