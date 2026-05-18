@@ -28,6 +28,7 @@ var KEYWORDS = map[string]bool{
 	"INTO":   true,
 	"CREATE": true,
 	"TABLE":  true,
+	"DROP":   true,
 }
 
 type Token struct {

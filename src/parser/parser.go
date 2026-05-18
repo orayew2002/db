@@ -42,5 +42,9 @@ func (p *Parser) Parse() (Statement, error) {
 		return p.parseUpdate()
 	}
 
+	if tok.Type == lexer.KEYWORD && tok.Val == "DROP" {
+		return p.parseDropTable()
+	}
+
 	return nil, fmt.Errorf("unknown statement: %s", tok.Val)
 }

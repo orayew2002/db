@@ -291,6 +291,24 @@ func TestParser(t *testing.T) {
 			"SET", "name", "=",
 		})
 	})
+
+	t.Run("drop table basic", func(t *testing.T) {
+		runTest(t, []string{
+			"DROP", "TABLE", "users",
+		})
+	})
+
+	t.Run("drop table missing table keyword", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DROP", "users",
+		})
+	})
+
+	t.Run("drop table missing table name", func(t *testing.T) {
+		runTestFail(t, []string{
+			"DROP", "TABLE",
+		})
+	})
 }
 
 func runTest(t *testing.T, q []string) {

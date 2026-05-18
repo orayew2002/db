@@ -8,6 +8,12 @@ import (
 )
 
 func (c *CLI) runStmt(s parser.Statement) {
+	if stmt, ok := s.(*parser.DropTableStmt); ok {
+		c.checkTable(stmt.Table)
+
+		// TODO need complete db function's for drop table there
+	}
+
 	if stmt, ok := s.(*parser.SelectStmt); ok {
 		c.checkTable(stmt.Table)
 
