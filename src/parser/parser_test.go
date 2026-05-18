@@ -309,6 +309,89 @@ func TestParser(t *testing.T) {
 			"DROP", "TABLE",
 		})
 	})
+
+	t.Run("alter table add single column", func(t *testing.T) {
+		runTest(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", "age", "INT",
+		})
+	})
+
+	t.Run("alter table add multiple columns", func(t *testing.T) {
+		runTest(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", "age", "INT",
+			",",
+			"ADD", "COLUMN", "email", "TEXT",
+		})
+	})
+
+	t.Run("alter table missing table keyword", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "users",
+			"ADD", "COLUMN", "age", "INT",
+		})
+	})
+
+	t.Run("alter table missing table name", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE",
+			"ADD", "COLUMN", "age", "INT",
+		})
+	})
+
+	t.Run("alter table missing add keyword", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"COLUMN", "age", "INT",
+		})
+	})
+
+	t.Run("alter table missing column keyword", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "age", "INT",
+		})
+	})
+
+	t.Run("alter table missing column name", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", "INT",
+		})
+	})
+
+	t.Run("alter table missing column type", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", "age",
+		})
+	})
+
+	t.Run("alter table invalid column name", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", ",", "INT",
+		})
+	})
+
+	t.Run("alter table missing second add", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", "age", "INT",
+			",",
+			"COLUMN", "email", "TEXT",
+		})
+	})
+
+	t.Run("alter table missing second column keyword", func(t *testing.T) {
+		runTestFail(t, []string{
+			"ALTER", "TABLE", "users",
+			"ADD", "COLUMN", "age", "INT",
+			",",
+			"ADD", "email", "TEXT",
+		})
+	})
 }
 
 func runTest(t *testing.T, q []string) {

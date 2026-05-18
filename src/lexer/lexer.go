@@ -17,18 +17,11 @@ const (
 )
 
 var KEYWORDS = map[string]bool{
-	"SELECT": true,
-	"FROM":   true,
-	"WHERE":  true,
-	"DELETE": true,
-	"UPDATE": true,
-	"SET":    true,
-	"VALUES": true,
-	"INSERT": true,
-	"INTO":   true,
-	"CREATE": true,
-	"TABLE":  true,
-	"DROP":   true,
+	"SELECT": true, "FROM": true, "WHERE": true,
+	"DELETE": true, "UPDATE": true, "SET": true,
+	"VALUES": true, "INSERT": true, "INTO": true,
+	"CREATE": true, "TABLE": true, "DROP": true,
+	"ALTER": true, "ADD": true, "COLUMN": true,
 }
 
 type Token struct {
