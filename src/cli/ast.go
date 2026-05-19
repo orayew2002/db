@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/orayew2002/db/src/parser"
 	"github.com/orayew2002/db/src/ui"
@@ -97,10 +98,7 @@ func (c *CLI) runStmt(s parser.Statement) {
 
 			for _, r := range rows {
 				if r[stmt.Where.Left].(string) == stmt.Where.Right {
-					for v, k := range stmt.Set {
-						r[v] = k
-					}
-
+					maps.Copy(r, stmt.Set)
 					nv = append(nv, r)
 				}
 			}
@@ -112,8 +110,14 @@ func (c *CLI) runStmt(s parser.Statement) {
 			return
 		}
 
-		// TODO
-		// need write logic for update all elements if where clauser not detected
+		for _, r := range rows {
+			maps.Copy(r, stmt.Set)
+
+			for k, v := range r {
+				c.db.Update(stmt.Table, k, v, r)
+				break
+			}
+		}
 	}
 }
 
