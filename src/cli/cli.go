@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/orayew2002/db/src/db"
 )
@@ -34,7 +33,14 @@ func (c *CLI) Run() {
 			break
 		}
 
-		c.runStmt(parseCMD(line))
+		if line == "clear" {
+			clearScreen()
+			continue
+		}
+
+		if err := c.runStmt(parseCMD(line)); err != nil {
+			fmt.Printf("error: %s \n", err.Error())
+		}
 	}
 }
 
@@ -43,7 +49,5 @@ func printPref() {
 }
 
 func clearScreen() {
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+	fmt.Print("\033[H\033[2J")
 }

@@ -8,27 +8,34 @@ import (
 	"github.com/orayew2002/db/src/ui"
 )
 
-func (c *CLI) runStmt(s parser.Statement) {
+func (c *CLI) runStmt(s parser.Statement) error {
 	if stmt, ok := s.(*parser.DropTableStmt); ok {
-		c.checkTable(stmt.Table)
+		if !c.checkTable(stmt.Table) {
+			return fmt.Errorf("%s table not exists", stmt.Table)
+		}
+
 		if err := c.db.DropTable(stmt.Table); err != nil {
-			panic(fmt.Errorf("error drop table: %w", err))
+			return fmt.Errorf("error drop table: %w", err)
 		}
 	}
 
 	if stmt, ok := s.(*parser.SelectStmt); ok {
-		c.checkTable(stmt.Table)
+		if !c.checkTable(stmt.Table) {
+			return fmt.Errorf("%s table not exists", stmt.Table)
+		}
 
 		date, err := c.db.Get(stmt.Table)
 		if err != nil {
-			panic(fmt.Errorf("error featching database data : %w", err))
+			return fmt.Errorf("error featching database data : %w", err)
 		}
 
 		ui.ShowTable(stmt.Table, date)
 	}
 
 	if stmt, ok := s.(*parser.InsertStmt); ok {
-		c.checkTable(stmt.Table)
+		if !c.checkTable(stmt.Table) {
+			return fmt.Errorf("%s table not exists", stmt.Table)
+		}
 
 		r := make(map[string]any, len(stmt.Values))
 		for i, c := range stmt.Columns {
@@ -36,16 +43,18 @@ func (c *CLI) runStmt(s parser.Statement) {
 		}
 
 		if err := c.db.Insert(stmt.Table, r); err != nil {
-			panic(fmt.Errorf("error inserting data to table: %w", err))
+			return fmt.Errorf("error inserting data to table: %w", err)
 		}
 	}
 
 	if stmt, ok := s.(*parser.DeleteStmt); ok {
-		c.checkTable(stmt.Table)
+		if !c.checkTable(stmt.Table) {
+			return fmt.Errorf("%s table not exists", stmt.Table)
+		}
 
 		rows, err := c.db.Get(stmt.Table)
 		if err != nil {
-			panic(fmt.Errorf("error featching database data : %w", err))
+			return fmt.Errorf("error featching database data : %w", err)
 		}
 
 		if stmt.Where != nil {
@@ -61,7 +70,7 @@ func (c *CLI) runStmt(s parser.Statement) {
 			}
 
 			fmt.Printf("delete data: %d \n", i)
-			return
+			return nil
 		}
 
 		var i int
@@ -78,20 +87,22 @@ func (c *CLI) runStmt(s parser.Statement) {
 
 	if stmt, ok := s.(*parser.CreateTableStmt); ok {
 		if err := c.db.CheckTable(stmt.Table); err == nil {
-			panic("this table already exists")
+			return fmt.Errorf("%s table already exists", stmt.Table)
 		}
 
 		if err := c.db.CreateTable(stmt.Table, stmt.Columns); err != nil {
-			panic(fmt.Errorf("error creating table: %w", err))
+			return fmt.Errorf("error creating table: %w", err)
 		}
 	}
 
 	if stmt, ok := s.(*parser.UpdateStmt); ok {
-		c.checkTable(stmt.Table)
+		if !c.checkTable(stmt.Table) {
+			return fmt.Errorf("%s table not exists", stmt.Table)
+		}
 
 		rows, err := c.db.Get(stmt.Table)
 		if err != nil {
-			panic(fmt.Errorf("error getting data: %w", err))
+			return fmt.Errorf("error getting data: %w", err)
 		}
 
 		if stmt.Where != nil {
@@ -108,7 +119,7 @@ func (c *CLI) runStmt(s parser.Statement) {
 				c.db.Update(stmt.Table, stmt.Where.Left, stmt.Where.Right, n)
 			}
 
-			return
+			return nil
 		}
 
 		for _, r := range rows {
@@ -120,10 +131,10 @@ func (c *CLI) runStmt(s parser.Statement) {
 			}
 		}
 	}
+
+	return nil
 }
 
-func (c *CLI) checkTable(table string) {
-	if err := c.db.CheckTable(table); err != nil {
-		panic(fmt.Errorf("table not exists"))
-	}
+func (c *CLI) checkTable(table string) bool {
+	return c.db.CheckTable(table) == nil
 }

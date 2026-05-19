@@ -1,6 +1,6 @@
 # 📂 Important Learnings
 
-I created a folder called `important/` where I document key concepts and lessons.
+I created a folder called `doc/` where I document key concepts and lessons.
 
 Each file inside this folder focuses on a specific topic or problem I encountered.
 
