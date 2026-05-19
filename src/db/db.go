@@ -89,12 +89,7 @@ func (d *Database) CreateTable(name string, columns []ColDef) error {
 	}
 
 	d.applyCreateTable(name, columns)
-
-	if d.uwc {
-		return d.w.Commit(lsn)
-	}
-
-	return nil
+	return d.w.Commit(d.uwc, lsn)
 }
 
 func (d *Database) DropTable(t string) error {
@@ -108,12 +103,7 @@ func (d *Database) DropTable(t string) error {
 	}
 
 	d.applyDropTable(t)
-
-	if d.uwc {
-		return d.w.Commit(lsn)
-	}
-
-	return nil
+	return d.w.Commit(d.uwc, lsn)
 }
 
 func (d *Database) Delete(t string, col string, val any) error {
@@ -127,11 +117,7 @@ func (d *Database) Delete(t string, col string, val any) error {
 	}
 
 	d.applyDelete(t, col, val)
-	if d.uwc {
-		return d.w.Commit(lsn)
-	}
-
-	return nil
+	return d.w.Commit(d.uwc, lsn)
 }
 
 func (d *Database) Insert(t string, v map[string]any) error {
@@ -145,11 +131,7 @@ func (d *Database) Insert(t string, v map[string]any) error {
 	}
 
 	d.applyInsert(t, v)
-	if d.uwc {
-		_ = d.w.Commit(lsn)
-	}
-
-	return nil
+	return d.w.Commit(d.uwc, lsn)
 }
 
 func (d *Database) Update(name string, col string, val any, v map[string]any) error {
@@ -163,11 +145,7 @@ func (d *Database) Update(name string, col string, val any, v map[string]any) er
 	}
 
 	d.applyUpdate(name, col, val, v)
-	if d.uwc {
-		d.w.Commit(lsn)
-	}
-
-	return nil
+	return d.w.Commit(d.uwc, lsn)
 }
 
 func (d *Database) Get(name string) ([]map[string]any, error) {
@@ -209,6 +187,10 @@ func (d *Database) Close() {
 
 func (d *Database) apply(a wal.Action) error {
 	switch a.T {
+	case wal.DT:
+		d.applyDropTable(a.Table)
+		return nil
+
 	case wal.CT:
 		protoTableCols := a.Val.([]*proto.TableCol)
 		cols := make([]ColDef, len(protoTableCols))
@@ -226,10 +208,11 @@ func (d *Database) apply(a wal.Action) error {
 		}
 		d.applyInsert(a.Table, v)
 		return nil
-	case wal.D:
 
+	case wal.D:
 		d.applyDelete(a.Table, a.Col, a.Val)
 		return nil
+
 	case wal.U:
 		m, ok := a.Val.(map[string]any)
 		if !ok {
@@ -243,6 +226,7 @@ func (d *Database) apply(a wal.Action) error {
 
 		d.applyUpdate(a.Table, a.Col, m["val"], v)
 		return nil
+
 	default:
 		return fmt.Errorf("unsupported action %q", a.T)
 	}

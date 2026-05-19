@@ -148,13 +148,22 @@ func (w *Wal) Append(a T, table string, arg Arg) (uint64, error) {
 	return w.lsn, nil
 }
 
-func (w *Wal) Commit(lsn uint64) error {
+// Commit waits until the WAL is flushed up to the provided LSN.
+//
+// If cm is false, the function returns immediately without waiting.
+// If cm is true, it blocks until flushedLSN >= lsn.
+func (w *Wal) Commit(cm bool, lsn uint64) error {
+	if !cm {
+		return nil
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	for w.flushedLSN < lsn {
 		w.cond.Wait()
 	}
+
 	return nil
 }
 
