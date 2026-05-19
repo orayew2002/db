@@ -9,6 +9,10 @@ message CreateTable{
   repeated TableCol cols = 1; 
 }
 
+message DropTable{
+  string name = 1;
+}
+
 message TableCol {
   string name = 1;
   string type = 2;

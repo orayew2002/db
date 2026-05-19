@@ -97,6 +97,25 @@ func (d *Database) CreateTable(name string, columns []ColDef) error {
 	return nil
 }
 
+func (d *Database) DropTable(t string) error {
+	if err := d.CheckTable(t); err != nil {
+		return err
+	}
+
+	lsn, err := d.w.Append(wal.DT, t, DropTable{})
+	if err != nil {
+		return err
+	}
+
+	d.applyDropTable(t)
+
+	if d.uwc {
+		return d.w.Commit(lsn)
+	}
+
+	return nil
+}
+
 func (d *Database) Delete(t string, col string, val any) error {
 	if _, err := d.table(t); err != nil {
 		return err
@@ -108,7 +127,9 @@ func (d *Database) Delete(t string, col string, val any) error {
 	}
 
 	d.applyDelete(t, col, val)
-	d.w.Commit(lsn)
+	if d.uwc {
+		return d.w.Commit(lsn)
+	}
 
 	return nil
 }
@@ -127,6 +148,7 @@ func (d *Database) Insert(t string, v map[string]any) error {
 	if d.uwc {
 		_ = d.w.Commit(lsn)
 	}
+
 	return nil
 }
 
@@ -226,11 +248,11 @@ func (d *Database) apply(a wal.Action) error {
 	}
 }
 
-func (d *Database) applyCreateTable(name string, columns []ColDef) {
-	if _, ext := d.tables[name]; ext {
-		return
-	}
+func (d *Database) applyDropTable(name string) {
+	delete(d.tables, name)
+}
 
+func (d *Database) applyCreateTable(name string, columns []ColDef) {
 	d.tables[name] = &Table{
 		Name:    name,
 		Columns: append(make([]ColDef, 0), columns...),

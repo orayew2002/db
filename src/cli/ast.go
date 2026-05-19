@@ -11,8 +11,9 @@ import (
 func (c *CLI) runStmt(s parser.Statement) {
 	if stmt, ok := s.(*parser.DropTableStmt); ok {
 		c.checkTable(stmt.Table)
-
-		// TODO need complete db function's for drop table there
+		if err := c.db.DropTable(stmt.Table); err != nil {
+			panic(fmt.Errorf("error drop table: %w", err))
+		}
 	}
 
 	if stmt, ok := s.(*parser.SelectStmt); ok {

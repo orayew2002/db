@@ -48,9 +48,7 @@ func (d Delete) AppendRaw(dst []byte) []byte {
 	return append(dst, b...)
 }
 
-func (d Delete) Vals() []string {
-	return nil
-}
+func (d Delete) Vals() []string { return nil }
 
 type Insert struct {
 	Val map[string]any
@@ -60,9 +58,7 @@ func (i Insert) AppendRaw(dst []byte) []byte {
 	return appendMapJSON(dst, i.Val)
 }
 
-func (i Insert) Vals() []string {
-	return nil
-}
+func (i Insert) Vals() []string { return nil }
 
 type Update struct {
 	Col  string
@@ -77,6 +73,9 @@ func (u Update) AppendRaw(dst []byte) []byte {
 	return append(dst, b...)
 }
 
-func (u Update) Vals() []string {
-	return nil
-}
+func (u Update) Vals() []string { return nil }
+
+type DropTable struct{}
+
+func (dt DropTable) AppendRaw(dst []byte) []byte { return nil }
+func (dt DropTable) Vals() []string              { return nil }
