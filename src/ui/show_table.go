@@ -9,7 +9,7 @@ import (
 
 func ShowTable(title string, cols []map[string]any) {
 	if len(cols) == 0 {
-		fmt.Println("empty table")
+		fmt.Fprintln(os.Stdout, "empty table")
 		return
 	}
 

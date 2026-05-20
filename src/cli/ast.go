@@ -8,7 +8,7 @@ import (
 	"github.com/orayew2002/db/src/ui"
 )
 
-func (c *CLI) runStmt(s parser.Statement) error {
+func (c *CLI) RunStmt(s parser.Statement) error {
 	if stmt, ok := s.(*parser.DropTableStmt); ok {
 		if !c.checkTable(stmt.Table) {
 			return fmt.Errorf("%s table not exists", stmt.Table)

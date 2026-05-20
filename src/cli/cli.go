@@ -38,7 +38,7 @@ func (c *CLI) Run() {
 			continue
 		}
 
-		if err := c.runStmt(parseCMD(line)); err != nil {
+		if err := c.RunStmt(ParseCMD(line)); err != nil {
 			fmt.Printf("error: %s \n", err.Error())
 		}
 	}

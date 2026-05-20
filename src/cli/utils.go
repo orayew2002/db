@@ -9,7 +9,7 @@ import (
 
 type Action string
 
-func parseCMD(cmd string) parser.Statement {
+func ParseCMD(cmd string) parser.Statement {
 	s, err := (parser.New(lexer.New(cmd))).Parse()
 	if err != nil {
 		fmt.Println("query error")
