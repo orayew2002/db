@@ -6,14 +6,16 @@ import (
 	"os"
 
 	"github.com/orayew2002/db/src/db"
+	"github.com/orayew2002/db/src/executor"
+	"github.com/orayew2002/db/src/ui"
 )
 
 type CLI struct {
-	db *db.Database
+	exec *executor.Exec
 }
 
 func NewCli(db *db.Database) *CLI {
-	return &CLI{db: db}
+	return &CLI{exec: &executor.Exec{DB: db}}
 }
 
 func (c *CLI) Run() {
@@ -38,9 +40,13 @@ func (c *CLI) Run() {
 			continue
 		}
 
-		if err := c.RunStmt(ParseCMD(line)); err != nil {
+		err, res := c.exec.ExecStmt(ParseCMD(line))
+		if err != nil {
 			fmt.Printf("error: %s \n", err.Error())
+			continue
 		}
+
+		ui.ShowTable(res.Name, res.Rows)
 	}
 }
 

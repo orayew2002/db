@@ -1,11 +1,13 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"syscall"
 
 	"github.com/orayew2002/db/src/cli"
 	"github.com/orayew2002/db/src/db"
+	"github.com/orayew2002/db/src/executor"
 )
 
 type Config struct {
@@ -15,19 +17,19 @@ type Config struct {
 }
 
 type Server struct {
-	fd  int
-	cli *cli.CLI
+	fd   int
+	exec *executor.Exec
 }
 
-func Default() (*Server, error) {
+func Default(db *db.Database) (*Server, error) {
 	return New(Config{
 		Port:    9696,
 		Addr:    [4]byte{0, 0, 0, 0},
 		Backlog: 10,
-	})
+	}, db)
 }
 
-func New(s Config) (*Server, error) {
+func New(s Config, db *db.Database) (*Server, error) {
 	// 1. socket()
 	// We ask the Linux kernel to create a TCP socket.
 	//
@@ -79,14 +81,9 @@ func New(s Config) (*Server, error) {
 		return nil, fmt.Errorf("error listening tcp socket: %w", err)
 	}
 
-	db := db.Create(db.Options{
-		WFP: "database/wal",
-		FFP: "database/db",
-	})
-
 	return &Server{
-		fd:  fd,
-		cli: cli.NewCli(db),
+		fd:   fd,
+		exec: &executor.Exec{DB: db},
 	}, nil
 }
 
@@ -115,6 +112,33 @@ func (s *Server) Run() error {
 			continue
 		}
 
-		s.cli.RunStmt(cli.ParseCMD(string(buf[:n])))
+		stmt := cli.ParseCMD(string(buf[:n]))
+		err, data := s.exec.ExecStmt(stmt)
+		if err != nil {
+			syscall.Write(nfd, []byte(err.Error()))
+			continue
+		}
+
+		if data == nil {
+			syscall.Write(nfd, []byte("s"))
+			continue
+		}
+
+		rows := make([][]any, len(data.Rows))
+		for i, v := range data.Rows {
+			rows = append(rows, make([]any, 0, len(v)))
+
+			for _, f := range v {
+				rows[i] = append(rows[i], f)
+			}
+		}
+
+		b, err := json.Marshal(rows)
+		if err != nil {
+			syscall.Write(nfd, []byte(err.Error()))
+			continue
+		}
+
+		syscall.Write(nfd, b)
 	}
 }
