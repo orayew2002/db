@@ -118,6 +118,10 @@ func (s *Server) handleConn(nfd int) {
 			continue
 		}
 
+		if n == 0 {
+			return
+		}
+
 		// TODO there need remove parseCMD from cli package
 		// maybe create own module, or explode it to another method without CLI struct
 		stmt := cli.ParseCMD(string(buf[:n]))
