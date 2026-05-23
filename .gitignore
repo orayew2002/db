@@ -2,3 +2,5 @@ database
 .gocache
 .gomodcache
 *.pb.go
+*.out
+*.test
