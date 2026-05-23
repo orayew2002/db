@@ -73,7 +73,6 @@ func (c *Exec) ExecStmt(s parser.Statement) (error, *db.Table) {
 				}
 			}
 
-			fmt.Printf("delete data: %d \n", i)
 			return nil, nil
 		}
 
@@ -85,8 +84,6 @@ func (c *Exec) ExecStmt(s parser.Statement) (error, *db.Table) {
 				break
 			}
 		}
-
-		fmt.Printf("delete data: %d \n", i)
 	}
 
 	if stmt, ok := s.(*parser.CreateTableStmt); ok {

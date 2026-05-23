@@ -105,7 +105,13 @@ func (s *Server) Run() error {
 			continue
 		}
 
-		buf := make([]byte, 1024)
+		go s.handleConn(nfd)
+	}
+}
+
+func (s *Server) handleConn(nfd int) {
+	buf := make([]byte, 1024)
+	for {
 		n, err := syscall.Read(nfd, buf)
 		if err != nil {
 			fmt.Printf("error reading request: %s", err.Error())
@@ -126,10 +132,11 @@ func (s *Server) Run() error {
 
 		rows := make([][]any, len(data.Rows))
 		for i, v := range data.Rows {
-			rows = append(rows, make([]any, 0, len(v)))
-
+			rows[i] = make([]any, len(v))
+			j := 0
 			for _, f := range v {
-				rows[i] = append(rows[i], f)
+				rows[i][j] = f
+				j++
 			}
 		}
 
