@@ -40,13 +40,15 @@ func (c *CLI) Run() {
 			continue
 		}
 
-		err, res := c.exec.ExecStmt(ParseCMD(line))
+		err, table := c.exec.ExecStmt(ParseCMD(line))
 		if err != nil {
 			fmt.Printf("error: %s \n", err.Error())
 			continue
 		}
 
-		ui.ShowTable(res.Name, res.Rows)
+		if table != nil {
+			ui.ShowTable(table.Name, table.Rows)
+		}
 	}
 }
 

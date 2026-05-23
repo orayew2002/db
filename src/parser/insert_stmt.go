@@ -87,7 +87,9 @@ func (p *Parser) parseInsert() (*InsertStmt, error) {
 			break
 		}
 
-		stmt.Values = append(stmt.Values, t.Val)
+		if t.Type == lexer.STRING || t.Type == lexer.NUMBER {
+			stmt.Values = append(stmt.Values, t.Val)
+		}
 	}
 
 	return stmt, nil

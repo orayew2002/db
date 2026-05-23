@@ -9,6 +9,18 @@ import (
 	"github.com/orayew2002/db/src/db"
 )
 
+type User struct {
+	Id   string
+	Name string
+}
+
+var testUsers = [4]User{
+	User{Id: "1", Name: "John Ueak"},
+	User{Id: "2", Name: "Lionel Messi"},
+	User{Id: "3", Name: "Cristiano Ronaldo"},
+	User{Id: "4", Name: "MBapbe"},
+}
+
 func TestServer(t *testing.T) {
 	db := db.Create(db.Options{
 		WFP: "../../database/wal",
@@ -29,7 +41,7 @@ func TestServer(t *testing.T) {
 	}
 
 	t.Run("create new table", func(t *testing.T) {
-		nc.Write([]byte("CREATE TABLE users (id text)"))
+		nc.Write([]byte("CREATE TABLE users (id text, name text)"))
 
 		buf := make([]byte, 1024)
 		n, err := nc.Read(buf)
@@ -43,10 +55,9 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("insert to table", func(t *testing.T) {
-		for i := 1; i <= 5; i++ {
-			q := fmt.Sprintf(
-				"INSERT INTO users (id) VALUES ('%d')",
-				i,
+		for _, user := range testUsers {
+			q := fmt.Sprintf("INSERT INTO users (id , name) VALUES ('%s' , '%s')",
+				user.Id, user.Name,
 			)
 
 			_, err := nc.Write([]byte(q))
