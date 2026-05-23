@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/orayew2002/db/src/fm"
 	"github.com/orayew2002/db/src/proto"
@@ -153,7 +154,17 @@ func (d *Database) Get(name string) ([]map[string]any, error) {
 		return nil, err
 	}
 
-	return d.tables[name].Rows, nil
+	original := d.tables[name].Rows
+
+	copied := make([]map[string]any, len(original))
+
+	for i, row := range original {
+		newRow := make(map[string]any)
+		maps.Copy(newRow, row)
+		copied[i] = newRow
+	}
+
+	return copied, nil
 }
 
 func (d *Database) GetColumns(name string) ([]ColDef, error) {
