@@ -118,7 +118,10 @@ func (s *Server) handleConn(nfd int) {
 			continue
 		}
 
+		// TODO there need remove parseCMD from cli package
+		// maybe create own module, or explode it to another method without CLI struct
 		stmt := cli.ParseCMD(string(buf[:n]))
+
 		err, data := s.exec.ExecStmt(stmt)
 		if err != nil {
 			syscall.Write(nfd, []byte(err.Error()))
