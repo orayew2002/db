@@ -3,12 +3,34 @@ package db
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 )
 
+type (
+	Row  map[string]any
+	Rows []Row
+)
+
+// Select modifies the rows in-place, keeping only the keys specified in 's'
+func (r *Rows) Select(s []string) {
+	// If the pointer or slice is nil, there's nothing to filter
+	if r == nil || *r == nil {
+		return
+	}
+
+	for i, row := range *r {
+		for k := range row {
+			if !slices.Contains(s, k) {
+				delete((*r)[i], k)
+			}
+		}
+	}
+}
+
 type Table struct {
-	Name    string           `json:"name"`
-	Columns []ColDef         `json:"columns"`
-	Rows    []map[string]any `json:"rows"`
+	Name    string   `json:"name"`
+	Columns []ColDef `json:"columns"`
+	Rows    Rows     `json:"rows"`
 }
 
 func (t *Table) Insert(row Row) {

@@ -149,14 +149,17 @@ func (d *Database) Update(name string, col string, val any, v map[string]any) er
 	return d.w.Commit(d.uwc, lsn)
 }
 
-func (d *Database) Get(name string) ([]map[string]any, error) {
+func (d *Database) Get(name string) (Rows, error) {
 	if err := d.CheckTable(name); err != nil {
 		return nil, err
 	}
 
+	// This block code is critical, need optimize this code
+	// this is so bad practices in large data using maps.copy
+	// there will many allocation and large storage space
 	original := d.tables[name].Rows
 
-	copied := make([]map[string]any, len(original))
+	copied := make(Rows, len(original))
 
 	for i, row := range original {
 		newRow := make(map[string]any)

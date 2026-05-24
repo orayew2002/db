@@ -3,7 +3,6 @@ package executor
 import (
 	"fmt"
 	"maps"
-	"slices"
 
 	"github.com/orayew2002/db/src/db"
 	"github.com/orayew2002/db/src/parser"
@@ -29,22 +28,16 @@ func (c *Exec) ExecStmt(s parser.Statement) (error, *db.Table) {
 			return fmt.Errorf("%s table not exists", stmt.Table), nil
 		}
 
-		table, err := c.DB.Get(stmt.Table)
+		rows, err := c.DB.Get(stmt.Table)
 		if err != nil {
 			return fmt.Errorf("error featching database data : %w", err), nil
 		}
 
 		if len(stmt.Columns) > 0 && stmt.Columns[0] != "*" {
-			for i, rows := range table {
-				for k := range rows {
-					if !slices.Contains(stmt.Columns, k) {
-						delete(table[i], k)
-					}
-				}
-			}
+			rows.Select(stmt.Columns)
 		}
 
-		return nil, &db.Table{Name: stmt.Table, Rows: table}
+		return nil, &db.Table{Name: stmt.Table, Rows: rows}
 	}
 
 	if stmt, ok := s.(*parser.InsertStmt); ok {

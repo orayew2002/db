@@ -9,6 +9,7 @@ import (
 type SelectStmt struct {
 	Table   string
 	Columns []string
+	Where   *WhereClause
 }
 
 func (SelectStmt) isStatement() {}
@@ -53,6 +54,30 @@ func (p *Parser) parseSelect() (*SelectStmt, error) {
 	}
 
 	stmt.Table = tok.Val
+
+	if tok, ok = p.l.NextToken(); ok && tok.Type == lexer.KEYWORD && tok.Val == "WHERE" {
+		var whereClause WhereClause
+
+		token, ok := p.l.NextToken()
+		if !ok || token.Type != lexer.IDENTIFIER {
+			return nil, fmt.Errorf("error query left side")
+		}
+		whereClause.Left = token.Val
+
+		token, ok = p.l.NextToken()
+		if !ok || token.Type != lexer.SYMBOL {
+			return nil, fmt.Errorf("error query where clause symbol")
+		}
+		whereClause.Operator = token.Val
+
+		token, ok = p.l.NextToken()
+		if !ok || (token.Type != lexer.STRING && token.Type != lexer.NUMBER) {
+			return nil, fmt.Errorf("error query where clause right side")
+		}
+		whereClause.Right = token.Val
+
+		stmt.Where = &whereClause
+	}
 
 	return stmt, nil
 }
